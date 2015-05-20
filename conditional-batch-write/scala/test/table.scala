@@ -61,6 +61,8 @@ trait TableBehaviors extends FlatSpec with TableTools {
         assertMoneyConserved (table)
       }}}}
 
+class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
+
 class JavaConcurrentSkipListMapSpec extends TableBehaviors with NewJavaConcurrentSkipListMap
 
 class JavaHashMapOfTreeMapSpec extends TableBehaviors with NewJavaHashMapOfTreeMap

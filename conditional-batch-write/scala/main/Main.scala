@@ -1,5 +1,7 @@
 package experiments
 
+class DisruptorTablePerf extends TablePerf with NewDisruptorTable
+
 class JavaConcurrentSkipListMapPerf extends TablePerf with NewJavaConcurrentSkipListMap
 
 class JavaHashMapOfTreeMapPerf extends TablePerf with NewJavaHashMapOfTreeMap
@@ -50,9 +52,10 @@ object Main {
     // Multithreaded measurements.
     //
 
+    //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
     //(new JavaConcurrentSkipListMapPerf).perf()            // 208 ops/ms
-    //(new QueuedJavaHashMapOfTreeMapPerf).perf()           // 90 ops/ms
-    //(new SingleThreadJavaHashMapOfTreeMapPerf).perf()     // 93 ops/ms
+    //(new QueuedJavaHashMapOfTreeMapPerf).perf()           //  90 ops/ms
+    //(new SingleThreadJavaHashMapOfTreeMapPerf).perf()     //  93 ops/ms
     //(new SynchronizedJavaHashMapOfTreeMapPerf).perf()     // 298 ops/ms
     //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
 
@@ -60,4 +63,5 @@ object Main {
     // SingleThreadJavaHashMapOfTreeMap cause concern for SingleThreadShardedTable.
     //(new SingleThreadShardedTablePerf).perf()             // 521 ops/ms
     (new SynchronizedShardedTablePerf).perf()               // 531 ops/ms
+
   }}
