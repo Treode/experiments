@@ -7,7 +7,7 @@ import scala.collection.JavaConversions._
   * `t' = Int.MaxValue - x`, so searching for the ceiling of `Int.MaxValue` will find the the most
   * recent value for the key. This is not thread safe.
   */
-class JavaHashMapOfTreeMap (hint: Int) extends Table {
+class JavaHashMapOfTreeMap (hint: Int = 16) extends Shard with Table {
 
   private val table = new HashMap [Int, TreeMap [Int, Int]] (hint)
 
@@ -15,57 +15,44 @@ class JavaHashMapOfTreeMap (hint: Int) extends Table {
 
   def time = clock
 
-  private def get (k: Int) = {
-    var vs = table.get (k)
-    if (vs == null) {
-      vs = new TreeMap [Int, Int]
-      table.put (k, vs)
-    }
-    vs
-  }
-
-  private def put (k: Int, v: Int, x: Int) = {
-    var vs = table.get (k)
-    if (vs == null) {
-      vs = new java.util.TreeMap [Int, Int]
-      table.put (k, vs)
-    }
-    vs.put (x, v)
-  }
-
-  private def read (x: Int, k: Int): Value = {
-    val vs = get (k)
-    val i = vs.tailMap (x)
+  def read (t: Int, k: Int): Value = {
+    val vs = table.get (k)
+    if (vs == null)
+      return Value.empty
+    val i = vs.tailMap (Int.MaxValue - t)
     if (i.isEmpty)
       return Value.empty
     val (x2, v) = i.head
     return Value (v, Int.MaxValue - x2)
   }
 
-  def read (t: Int, ks: Int*): Seq [Value] = {
-    val x = Int.MaxValue - t
-    ks map (read (x, _))
-  }
+  def read (t: Int, ks: Int*): Seq [Value] =
+    ks map (read (t, _))
 
-  private def prepare (r: Row): Int = {
-    val vs = get (r.k)
-    if (vs.isEmpty)
-      return Int.MaxValue
-    return vs.firstKey
+  def prepare (r: Row): Int = {
+    val vs = table.get (r.k)
+    if (vs == null)
+      return 0
+    return Int.MaxValue - vs.firstKey
   }
 
   private def prepare (t: Int, rs: Seq [Row]) {
-    val max = Int.MaxValue - (rs.map (prepare (_)) .min)
+    val max = rs.map (prepare (_)) .max
     if (max > t) throw new StaleException (t, max)
   }
 
-  private def commit (x: Int, r: Row): Unit =
-    put (r.k, r.v, x)
+  def commit (t: Int, r: Row) {
+    var vs = table.get (r.k)
+    if (vs == null) {
+      vs = new java.util.TreeMap [Int, Int]
+      table.put (r.k, vs)
+    }
+    vs.put (Int.MaxValue - t, r.v)
+  }
 
   private def commit (rs: Seq [Row]): Int = {
     clock += 1
-    val x = Int.MaxValue - clock
-    rs foreach (commit (x, _))
+    rs foreach (commit (clock, _))
     clock
   }
 
@@ -73,6 +60,14 @@ class JavaHashMapOfTreeMap (hint: Int) extends Table {
     prepare (t, rs)
     commit (rs)
   }
+
+  def scan (t: Int): Seq [Cell] =
+    for {
+      (k, vs) <- table.toSeq
+      (x, v) <- vs
+      t2 = Int.MaxValue - x
+      if t2 < t
+    } yield Cell (k, v, t2)
 
   def scan(): Seq [Cell] =
     for ((k, vs) <- table.toSeq; (x, v) <- vs) yield Cell (k, v, Int.MaxValue - x)
