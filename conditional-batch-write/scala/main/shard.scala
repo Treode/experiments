@@ -78,16 +78,16 @@ class ReadWriteShard (shard: Shard) extends Shard {
 class SingleThreadShard (shard: Shard, scheduler: SingleThreadScheduler) extends Shard {
 
   def read (t: Int, k: Int): Value =
-    scheduler.submit (shard.read (t, k))
+    scheduler.submit (shard.read (t, k)) .safeGet
 
   def prepare (r: Row): Int =
-    scheduler.submit (shard.prepare (r))
+    scheduler.submit (shard.prepare (r)) .safeGet
 
   def commit (t: Int, r: Row): Unit =
     scheduler.execute (shard.commit (t, r))
 
   def scan (t: Int): Seq [Cell] =
-    scheduler.submit (shard.scan (t: Int))
+    scheduler.submit (shard.scan (t: Int)) .safeGet
 
   def close(): Unit =
     scheduler.shutdown()

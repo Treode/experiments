@@ -10,7 +10,7 @@ trait SingleThreadScheduler {
   def execute (task: => Any)
 
   /** Call from any thread to schedule a task and await the result. */
-  def submit [A] (task: => A): A
+  def submit [A] (task: => A): Future [A]
 
   def shutdown()
 }
@@ -51,15 +51,10 @@ object SingleThreadScheduler {
         def run(): Unit = task
       })
 
-    def submit [A] (task: => A): A =
-      try {
-        executor.submit (new Callable [A] {
-          def call(): A = task
-        }) .get
-      } catch {
-        case t: ExecutionException =>
-          throw t.getCause
-      }
+    def submit [A] (task: => A): Future [A] =
+      executor.submit (new Callable [A] {
+        def call(): A = task
+      })
 
     def shutdown(): Unit =
       executor.shutdown()
@@ -82,17 +77,13 @@ object SingleThreadScheduler {
         def run(): Unit = task
       })
 
-    def submit [A] (task: => A): A =
-      try {
-        val future = new FutureTask (new Callable [A] {
-          def call(): A = task
-        })
-        queue.enqueue (future)
-        future.get
-      } catch {
-        case t: ExecutionException =>
-          throw t.getCause
-      }
+    def submit [A] (task: => A): Future [A] = {
+      val future = new FutureTask (new Callable [A] {
+        def call(): A = task
+      })
+      queue.enqueue (future)
+      future
+    }
 
     def shutdown(): Unit =
       thread.interrupt()

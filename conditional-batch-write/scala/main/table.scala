@@ -110,16 +110,16 @@ class SynchronizedTable (table: Table) extends Table {
 class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends Table {
 
   def time: Int =
-    scheduler.submit (table.time)
+    scheduler.submit (table.time) .safeGet
 
   def read (t: Int, ks: Int*): Seq [Value] =
-    scheduler.submit (table.read (t, ks: _*))
+    scheduler.submit (table.read (t, ks: _*)) .safeGet
 
   def write (t: Int, rs: Row*): Int =
-    scheduler.submit (table.write (t, rs: _*))
+    scheduler.submit (table.write (t, rs: _*)) .safeGet
 
   def scan(): Seq [Cell] =
-    scheduler.submit (table.scan())
+    scheduler.submit (table.scan()) .safeGet
 
   def close(): Unit =
     scheduler.shutdown()
