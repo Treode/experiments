@@ -79,7 +79,7 @@ class JavaConcurrentSkipListMap (nlocks: Int) extends Table {
 
 trait NewJavaConcurrentSkipListMap extends NewTable {
 
-  def parallel = false
+  def parallel = true
 
   def newTable = new JavaConcurrentSkipListMap (4)
 }
