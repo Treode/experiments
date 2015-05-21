@@ -65,19 +65,11 @@ trait TableBehaviors extends FlatSpec with TableTools {
         assertMoneyConserved (table)
       }}}}
 
-class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
-
-class JavaConcurrentSkipListMapSpec extends TableBehaviors with NewJavaConcurrentSkipListMap
+//
+// Single-Threaded Strategies
+//
 
 class JavaHashMapOfTreeMapSpec extends TableBehaviors with NewJavaHashMapOfTreeMap
-
-class SynchronizedJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSynchronizedJavaHashMapOfTreeMap
-
-class SingleThreadJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSingleThreadExecutorJavaHashMapOfTreeMap
-
-class SimpleQueueJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSimpleQueueJavaHashMapOfTreeMap
-
-class ShardedQueueJavaHashMapOfTreeMapSpec extends TableBehaviors with NewShardedQueueJavaHashMapOfTreeMap
 
 class JavaTreeMapSpec extends TableBehaviors with NewJavaTreeMap
 
@@ -87,10 +79,30 @@ class ScalaMutableMapOfSortedMapSpec extends TableBehaviors with NewScalaMutable
 
 class ScalaSortedMapSpec extends TableBehaviors with NewScalaSortedMap
 
-class SingleThreadShardedTableSpec extends TableBehaviors with NewSynchronizedShardedTable
+class TroveHashMapOfTreeMapSpec extends TableBehaviors with NewTroveHashMapOfTreeMap
 
-class ReadWriteShardedTableSpec extends TableBehaviors with NewReadWriteShardedTable
+//
+// Single-Threaded Scheduler Strategies, using JavaHashMapOfTreeMap
+//
+
+class SingleThreadExecutorSpec extends TableBehaviors with NewSingleThreadExecutorTable
+
+class SimpleQueueSpec extends TableBehaviors with NewSimpleQueueTable
+
+class ShardedQueueSpec extends TableBehaviors with NewShardedQueueTable
+
+//
+// Thread-Safe Strategies
+//
+
+class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
+
+class JavaConcurrentSkipListMapSpec extends TableBehaviors with NewJavaConcurrentSkipListMap
+
+class SynchronizedTableSpec extends TableBehaviors with NewSynchronizedTable
 
 class SynchronizedShardedTableSpec extends TableBehaviors with NewSynchronizedShardedTable
 
-class TroveHashMapOfTreeMapSpec extends TableBehaviors with NewTroveHashMapOfTreeMap
+class ReadWriteShardedTableSpec extends TableBehaviors with NewReadWriteShardedTable
+
+class SingleThreadShardedTableSpec extends TableBehaviors with NewSingleThreadShardedTable

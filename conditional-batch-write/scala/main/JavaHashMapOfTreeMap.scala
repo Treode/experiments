@@ -81,37 +81,3 @@ trait NewJavaHashMapOfTreeMap extends NewTable {
 
   def newTable = new JavaHashMapOfTreeMap (naccounts)
 }
-
-trait NewSynchronizedJavaHashMapOfTreeMap extends NewTable {
-
-  def parallel = true
-
-  def newTable = new SynchronizedTable (new JavaHashMapOfTreeMap (naccounts))
-}
-
-trait NewSingleThreadExecutorJavaHashMapOfTreeMap extends NewTable {
-
-  def parallel = true
-
-  def newTable = new SingleThreadTable (
-    new JavaHashMapOfTreeMap (naccounts),
-    SingleThreadScheduler.usingSingleThreadExecutor)
-}
-
-trait NewSimpleQueueJavaHashMapOfTreeMap extends NewTable {
-
-  def parallel = true
-
-  def newTable = new SingleThreadTable (
-    new JavaHashMapOfTreeMap (naccounts),
-    SingleThreadScheduler.usingSimpleQueue)
-}
-
-trait NewShardedQueueJavaHashMapOfTreeMap extends NewTable {
-
-  def parallel = true
-
-  def newTable = new SingleThreadTable (
-    new JavaHashMapOfTreeMap (naccounts),
-    SingleThreadScheduler.usingShardedQueue (nshards))
-}

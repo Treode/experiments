@@ -177,12 +177,12 @@ object SingleThreadScheduler {
   }
 
   /** Use Java's SingleThreadExecutor for our SingleThreadScheduler. */
-  def usingSingleThreadExecutor(): SingleThreadScheduler =
+  def newUsingExecutor: SingleThreadScheduler =
     new UsingSingleThreadExecutor
 
-  def usingSimpleQueue(): SingleThreadScheduler =
+  def newUsingSimpleQueue: SingleThreadScheduler =
     new UsingQueue (new SimpleQueue)
 
-  def usingShardedQueue (nshards: Int): SingleThreadScheduler =
+  def newUsingShardedQueue (nshards: Int): SingleThreadScheduler =
     new UsingQueue (ShardedQueue (nshards))
 }

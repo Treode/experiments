@@ -41,25 +41,11 @@ trait TablePerf extends TableTools {
           return
       }}}}
 
-class DisruptorTablePerf extends TablePerf with NewDisruptorTable
-
-class JavaConcurrentSkipListMapPerf extends TablePerf with NewJavaConcurrentSkipListMap
+//
+// Single-Threaded Strategies
+//
 
 class JavaHashMapOfTreeMapPerf extends TablePerf with NewJavaHashMapOfTreeMap
-
-class SynchronizedJavaHashMapOfTreeMapPerf extends TablePerf with NewSynchronizedJavaHashMapOfTreeMap
-
-class SingleThreadExecutorJavaHashMapOfTreeMapPerf extends TablePerf with NewSingleThreadExecutorJavaHashMapOfTreeMap
-
-class SynchronizedShardedTablePerf extends TablePerf with NewSynchronizedShardedTable
-
-class ReadWriteShardedTablePerf extends TablePerf with NewReadWriteShardedTable
-
-class SingleThreadShardedTablePerf extends TablePerf with NewSingleThreadShardedTable
-
-class SimpleQueueJavaHashMapOfTreeMapPerf extends TablePerf with NewSimpleQueueJavaHashMapOfTreeMap
-
-class ShardedQueueJavaHashMapOfTreeMapPerf extends TablePerf with NewShardedQueueJavaHashMapOfTreeMap
 
 class JavaTreeMapPerf extends TablePerf with NewJavaTreeMap
 
@@ -71,11 +57,37 @@ class ScalaSortedMapPerf extends TablePerf with NewScalaSortedMap
 
 class TroveHashMapOfTreeMapPerf extends TablePerf with NewTroveHashMapOfTreeMap
 
+//
+// Single-Threaded Scheduler Strategies, using JavaHashMapOfTreeMap
+//
+
+class SingleThreadExecutorPerf extends TablePerf with NewSingleThreadExecutorTable
+
+class SimpleQueuePerf extends TablePerf with NewSimpleQueueTable
+
+class ShardedQueuePerf extends TablePerf with NewShardedQueueTable
+
+//
+// Thread-Safe Strategies
+//
+
+class DisruptorTablePerf extends TablePerf with NewDisruptorTable
+
+class JavaConcurrentSkipListMapPerf extends TablePerf with NewJavaConcurrentSkipListMap
+
+class SynchronizedTablePerf extends TablePerf with NewSynchronizedTable
+
+class SynchronizedShardedTablePerf extends TablePerf with NewSynchronizedShardedTable
+
+class ReadWriteShardedTablePerf extends TablePerf with NewReadWriteShardedTable
+
+class SingleThreadShardedTablePerf extends TablePerf with NewSingleThreadShardedTable
+
 object Main {
 
   def main (args: Array [String]) {
 
-    // Measurements 2.8 GHz Intel Core i7, Java 1.8.0_25
+    // Measurements on 2.8 GHz Intel Core i7, Java 1.8.0_25
 
     //
     // Single-threaded measurements.
@@ -92,15 +104,20 @@ object Main {
     (new JavaHashMapOfTreeMapPerf).perf()                   // 730 ops/ms
 
     //
+    // Single-threaded scheduler measurements.
+    //
+
+    //(new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
+    //(new SimpleQueuePerf).perf()                          //  90 ops/ms
+    //(new ShardedQueuePerf).perf()                         //  91 ops/ms
+
+    //
     // Multithreaded measurements.
     //
 
     //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
     //(new JavaConcurrentSkipListMapPerf).perf()            // 208 ops/ms
-    //(new SingleThreadExecutorJavaHashMapOfTreeMapPerf).perf() //  93 ops/ms
-    //(new SimpleQueueJavaHashMapOfTreeMapPerf).perf()      //  90 ops/ms
-    //(new ShardedQueueJavaHashMapOfTreeMapPerf).perf()     //  91 ops/ms
-    //(new SynchronizedJavaHashMapOfTreeMapPerf).perf()     // 298 ops/ms
+    //(new SynchronizedTablePerf).perf()                    // 298 ops/ms
     //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
     //(new SingleThreadShardedTablePerf).perf()             //  34 ops/ms
 

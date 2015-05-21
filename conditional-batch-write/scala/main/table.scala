@@ -85,6 +85,15 @@ trait NewTable {
 
   /** Make a table. */
   def newTable: Table
+
+  def newRecommendedTable: Table =
+    new JavaHashMapOfTreeMap (naccounts)
+
+  def newRecommendedShard: Shard =
+    new JavaHashMapOfTreeMap (naccounts)
+
+  def newRecommendedScheduler: SingleThreadScheduler =
+    SingleThreadScheduler.newUsingExecutor
 }
 
 /** Wrap a table with synchronized to make it thread safe. */
@@ -106,6 +115,13 @@ class SynchronizedTable (table: Table) extends Table {
     synchronized (table.close())
 }
 
+trait NewSynchronizedTable extends NewTable {
+
+  def parallel = true
+
+  def newTable = new SynchronizedTable (newRecommendedTable)
+}
+
 /** Wrap a table with a `SingleThreadScheduler` to make it thread safe. */
 class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends Table {
 
@@ -123,6 +139,33 @@ class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends
 
   def close(): Unit =
     scheduler.shutdown()
+}
+
+trait NewSingleThreadExecutorTable extends NewTable {
+
+  def parallel = true
+
+  def newTable = new SingleThreadTable (
+    newRecommendedTable,
+    SingleThreadScheduler.newUsingExecutor)
+}
+
+trait NewSimpleQueueTable extends NewTable {
+
+  def parallel = true
+
+  def newTable = new SingleThreadTable (
+    newRecommendedTable,
+    SingleThreadScheduler.newUsingSimpleQueue)
+}
+
+trait NewShardedQueueTable extends NewTable {
+
+  def parallel = true
+
+  def newTable = new SingleThreadTable (
+    newRecommendedTable,
+    SingleThreadScheduler.newUsingShardedQueue (nshards))
 }
 
 /** Methods to support functional and performance testing of the implementations. */
