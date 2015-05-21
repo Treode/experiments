@@ -105,101 +105,25 @@ class SynchronizedTable (table: Table) extends Table {
     synchronized (table.close())
 }
 
-/** Wrap a table with a SingleThreadedExecutor to make it thread safe. */
-class SingleThreadTable (table: Table) extends Table {
-
-  private val executor = Executors.newSingleThreadExecutor
-
-  private def submit [A] (f: => A): A =
-    try {
-      executor.submit (new Callable [A] {
-        def call(): A = f
-      }) .get
-    } catch {
-      case t: ExecutionException =>
-        throw t.getCause
-    }
+/** Wrap a table with a `SingleThreadScheduler` to make it thread safe. */
+class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends Table {
 
   def time: Int =
-    submit (table.time)
+    scheduler.submit (table.time)
 
   def read (t: Int, ks: Int*): Seq [Value] =
-    submit (table.read (t, ks: _*))
+    scheduler.submit (table.read (t, ks: _*))
 
   def write (t: Int, rs: Row*): Int =
-    submit (table.write (t, rs: _*))
+    scheduler.submit (table.write (t, rs: _*))
 
   def scan(): Seq [Cell] =
-    submit (table.scan())
+    scheduler.submit (table.scan())
 
   def close(): Unit =
-    executor.shutdown()
+    scheduler.shutdown()
 }
 
-/** A "naive" implementation of a thread-safe queue for a baseline. Performance in the context of
-  * QueuedTable turns out to be similar to newSingleThreadExecutor, which we assume uses one of the
-  * java.util.concurrent.FancyQueues.
-  */
-class SimpleQueue [A] {
-
-  private val q = new ArrayDeque [A]
-
-  def enqueue (v: A): Unit =
-    synchronized {
-      q.add (v)
-      notify()
-    }
-
-  def dequeue(): A =
-    synchronized {
-      while (q.isEmpty)
-        wait()
-      q.remove()
-    }}
-
-/** Wrap a table with a work queeu to run all its operations in one thread. */
-class QueuedTable (table: Table) extends Table {
-
-  private val queue = new SimpleQueue [FutureTask [_]]
-
-  private val thread = new Thread {
-    override def run(): Unit =
-      try {
-        while (true)
-          queue.dequeue().run()
-      } catch {
-        case t: InterruptedException => ()
-      }}
-  thread.start()
-
-  private def submit [A] (func: => A): A =
-    try {
-      val task = new FutureTask (new Callable [A] {
-        def call(): A = func
-      })
-      queue.enqueue (task)
-      task.get
-    } catch {
-      case t: ExecutionException =>
-        throw t.getCause
-    }
-
-  def time: Int =
-    submit (table.time)
-
-  def read (t: Int, ks: Int*): Seq [Value] =
-    submit (table.read (t, ks: _*))
-
-  def write (t: Int, rs: Row*): Int =
-    submit (table.write (t, rs: _*))
-
-  def scan(): Seq [Cell] =
-    submit (table.scan())
-
-  def close() {
-    thread.interrupt()
-    thread.join()
-  }}
 
 /** Methods to support functional and performance testing of the implementations. */
 trait TableTools {

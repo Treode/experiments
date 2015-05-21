@@ -75,37 +75,20 @@ class ReadWriteShard (shard: Shard) extends Shard {
 }
 
 /** Use `SingleThreadedExecutor` to make the shard thread safe. */
-class SingleThreadShard (shard: Shard) extends Shard {
-
-  private val executor = Executors.newSingleThreadExecutor
-
-  private def execute (f: => Any): Unit =
-    executor.execute (new Runnable {
-      def run() = f
-    })
-
-  private def submit [A] (f: => A): A =
-    try {
-      executor.submit (new Callable [A] {
-        def call(): A = f
-      }) .get
-    } catch {
-      case t: ExecutionException =>
-        throw t.getCause
-    }
+class SingleThreadShard (shard: Shard, scheduler: SingleThreadScheduler) extends Shard {
 
   def read (t: Int, k: Int): Value =
-    submit (shard.read (t, k))
+    scheduler.submit (shard.read (t, k))
 
   def prepare (r: Row): Int =
-    submit (shard.prepare (r))
+    scheduler.submit (shard.prepare (r))
 
   def commit (t: Int, r: Row): Unit =
-    execute (shard.commit (t, r))
+    scheduler.execute (shard.commit (t, r))
 
   def scan (t: Int): Seq [Cell] =
-    submit (shard.scan (t: Int))
+    scheduler.submit (shard.scan (t: Int))
 
   def close(): Unit =
-    executor.shutdown()
+    scheduler.shutdown()
 }

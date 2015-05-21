@@ -68,7 +68,10 @@ object ShardedTable {
 
   def singleThreadShards (nlocks: Int, nshards: Int): ShardedTable = {
     require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
-    new ShardedTable (LockSpace (nlocks), nshards - 1) (new SingleThreadShard (new JavaHashMapOfTreeMap))
+    new ShardedTable (LockSpace (nlocks), nshards - 1) (
+      new SingleThreadShard (
+        new JavaHashMapOfTreeMap,
+        SingleThreadScheduler.usingSingleThreadExecutor))
   }
 }
 
