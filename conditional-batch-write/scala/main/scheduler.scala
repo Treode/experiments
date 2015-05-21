@@ -131,13 +131,10 @@ object ShardedQueue {
 
 class JCToolsQueue [A] (capacity: Int) extends Queue [A] {
 
-  /** Spin lock this many times, then sleep between attempts. */
-  private val SPINS = 3
-
   private val q = new MpscCompoundQueue [A] (capacity)
 
   def enqueue (v: A) {
-    var n = SPINS
+    var n = 3
     var r = q.offer (v)
     while (!r && n > 0) {
       n -= 1
@@ -149,7 +146,7 @@ class JCToolsQueue [A] (capacity: Int) extends Queue [A] {
     }}
 
   def dequeue(): A = {
-    var n = SPINS
+    var n = 3000
     var v = q.poll()
     while (v == null && n > 0) {
       n -= 1

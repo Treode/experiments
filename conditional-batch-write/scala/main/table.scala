@@ -181,8 +181,8 @@ trait NewJCToolsQueueTable extends NewTable {
 trait TableTools {
   this: NewTable =>
 
-  val nbrokers = 8
-  val ntransfers = 1000
+  val nbrokers: Int
+  val ntransfers: Int
 
   /** Make a table, perform a method on it, close the table. */
   def withTable [A] (f: Table => A): A = {

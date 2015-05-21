@@ -10,6 +10,9 @@ trait TableBehaviors extends FlatSpec with TableTools {
   val nshards = 8
   val naccounts = 100
 
+  val nbrokers = 8
+  val ntransfers = 100
+
   def assertSeq [A] (expected: A*) (actual: Seq [A]): Unit =
     assertResult (expected) (actual)
 

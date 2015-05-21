@@ -1,28 +1,59 @@
 package experiments
 
+import scala.collection.mutable.Builder
+
+case class PerfParams (nshards: Int, nbrokers: Int) {
+
+  override def toString = s"nshards: $nshards, nbrokers: $nbrokers"
+}
+
+case class PerfResult (name: String, nshards: Int, nbrokers: Int, result: Double) {
+
+  override def toString = f"$name, $nshards, $nbrokers, $result"
+}
+
+class PerfResults {
+
+  private var results = List.empty [PerfResult]
+
+  def += (result: PerfResult): Unit =
+    results ::= result
+
+  override def toString: String =
+    "name, nshards, nbrokers, ops/ms\n" + (results.reverse mkString "\n")
+}
+
 /** Repeat transfers experiments until
   * - `count` execute within `tolerance` of the running mean time,
-  * - ntrials execute,
+  * - `ntrials` execute,
+  * - `nseconds` pass,
   * whichever comes first.
   *
   * Report measurements that are within `tolerance` of the running mean time.
   */
-trait TablePerf extends TableTools {
+class TablePerf (implicit p: PerfParams) extends TableTools {
   this: NewTable =>
 
-  val nlocks = 8
-  val nshards = 8
+  val nlocks = 1024
+  val nshards = p.nshards
   val naccounts = 100
 
+  val nbrokers = p.nbrokers
+  val ntransfers = 1000
+
   val ntrials = 2000
+  val nseconds = 60
   val count = 20
   val tolerance = 0.05
 
-  def perf() {
+  val M = 1000000.toDouble
 
-    println (getClass.getName)
+  def perf(): PerfResult = {
 
-    val M = 1000000.toDouble
+    val name = getClass.getSimpleName
+    println (s"$name, $p")
+
+    val limit  = System.currentTimeMillis + nseconds * 1000
     var sum = 0.toDouble
     var hits = count
 
@@ -38,99 +69,132 @@ trait TablePerf extends TableTools {
         println (f"$trial%5d: $x%8.2f ops/ms ($mean%8.2f)")
         hits -= 1
         if (hits == 0)
-          return
-      }}}}
+          return PerfResult (name, p.nshards, p.nbrokers, mean)
+      }
+      if (System.currentTimeMillis > limit)
+        return PerfResult (name, p.nshards, p.nbrokers, mean)
+    }
+    val mean = sum / ntrials.toDouble
+    PerfResult (name, p.nshards, p.nbrokers, mean)
+  }}
 
 //
 // Single-Threaded Strategies
 //
 
-class JavaHashMapOfTreeMapPerf extends TablePerf with NewJavaHashMapOfTreeMap
+class JavaHashMapOfTreeMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewJavaHashMapOfTreeMap
 
-class JavaTreeMapPerf extends TablePerf with NewJavaTreeMap
+class JavaTreeMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewJavaTreeMap
 
-class ScalaMapOfSortedMapPerf extends TablePerf with NewScalaMapOfSortedMap
+class ScalaMapOfSortedMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewScalaMapOfSortedMap
 
-class ScalaMutableMapOfSortedMapPerf extends TablePerf with NewScalaMutableMapOfSortedMap
+class ScalaMutableMapOfSortedMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewScalaMutableMapOfSortedMap
 
-class ScalaSortedMapPerf extends TablePerf with NewScalaSortedMap
+class ScalaSortedMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewScalaSortedMap
 
-class TroveHashMapOfTreeMapPerf extends TablePerf with NewTroveHashMapOfTreeMap
+class TroveHashMapOfTreeMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewTroveHashMapOfTreeMap
 
 //
-// Single-Threaded Scheduler Strategies, using JavaHashMapOfTreeMap
+// Single-Threaded Scheduler Strategies
 //
 
-class SingleThreadExecutorPerf extends TablePerf with NewSingleThreadExecutorTable
+class SingleThreadExecutorPerf (implicit p: PerfParams)
+  extends TablePerf with NewSingleThreadExecutorTable
 
-class SimpleQueuePerf extends TablePerf with NewSimpleQueueTable
+class SimpleQueuePerf (implicit p: PerfParams)
+  extends TablePerf with NewSimpleQueueTable
 
-class ShardedQueuePerf extends TablePerf with NewShardedQueueTable
+class ShardedQueuePerf (implicit p: PerfParams)
+  extends TablePerf with NewShardedQueueTable
 
-class JCToolsQueuePerf extends TablePerf with NewJCToolsQueueTable
+class JCToolsQueuePerf (implicit p: PerfParams)
+  extends TablePerf with NewJCToolsQueueTable
 
 //
 // Thread-Safe Strategies
 //
 
-class JavaConcurrentSkipListMapPerf extends TablePerf with NewJavaConcurrentSkipListMap
+class JavaConcurrentSkipListMapPerf (implicit p: PerfParams)
+  extends TablePerf with NewJavaConcurrentSkipListMap
 
-class SynchronizedTablePerf extends TablePerf with NewSynchronizedTable
+class SynchronizedTablePerf (implicit p: PerfParams)
+  extends TablePerf  with NewSynchronizedTable
 
-class SynchronizedShardedTablePerf extends TablePerf with NewSynchronizedShardedTable
+class SynchronizedShardedTablePerf (implicit p: PerfParams)
+  extends TablePerf with NewSynchronizedShardedTable
 
-class ReadWriteShardedTablePerf extends TablePerf with NewReadWriteShardedTable
+class ReadWriteShardedTablePerf (implicit p: PerfParams)
+  extends TablePerf with NewReadWriteShardedTable
 
-class SingleThreadShardedTablePerf extends TablePerf with NewSingleThreadShardedTable
+class SingleThreadShardedTablePerf (implicit p: PerfParams)
+  extends TablePerf with NewSingleThreadShardedTable
 
-class FutureSharededTablePerf extends TablePerf with NewFutureShardedTable
+class FutureShardedTablePerf (implicit p: PerfParams)
+  extends TablePerf with NewFutureShardedTable
 
-class CollectorSharededTablePerf extends TablePerf with NewCollectorShardedTable
+class CollectorShardedTablePerf (implicit p: PerfParams)
+  extends TablePerf with NewCollectorShardedTable
 
-class DisruptorTablePerf extends TablePerf with NewDisruptorTable
+class DisruptorTablePerf (implicit p: PerfParams)
+  extends TablePerf with NewDisruptorTable
 
 object Main {
 
+  // Cannot handle concurrent clients.
+  def unthreaded (results: PerfResults, nbrokers: Int) {
+
+    implicit val params = PerfParams (1, nbrokers)
+
+    results += (new JavaHashMapOfTreeMapPerf).perf()
+    results += (new JavaTreeMapPerf).perf()
+    results += (new ScalaMapOfSortedMapPerf).perf()
+    results += (new ScalaMutableMapOfSortedMapPerf).perf()
+    results += (new ScalaSortedMapPerf).perf()
+    results += (new TroveHashMapOfTreeMapPerf).perf()
+  }
+
+  // Queue tasks onto a single thread.
+  def queues (results: PerfResults, nbrokers: Int) {
+
+    implicit val params = PerfParams (1, nbrokers)
+
+    results += (new SingleThreadExecutorPerf).perf()
+    results += (new SimpleQueuePerf).perf()
+    results += (new ShardedQueuePerf).perf()
+    results += (new JCToolsQueuePerf).perf()
+  }
+
+  // Handle concurrent some other way.
+  def concurrent (results: PerfResults, nshards: Int, nbrokers: Int) {
+
+    implicit val params = PerfParams (nshards, nbrokers)
+
+    results += (new SynchronizedTablePerf).perf()
+    results += (new JavaConcurrentSkipListMapPerf).perf()
+    results += (new SynchronizedShardedTablePerf).perf()
+    results += (new ReadWriteShardedTablePerf).perf()
+    results += (new SingleThreadShardedTablePerf).perf()
+    results += (new FutureShardedTablePerf).perf()
+    results += (new CollectorShardedTablePerf).perf()
+    //Fails under stress.
+    //results += (new DisruptorTablePerf).perf()
+  }
+
   def main (args: Array [String]) {
-
-    // Measurements on 2.8 GHz Intel Core i7, Java 1.8.0_25
-
-    //
-    // Single-threaded measurements.
-    //
-
-    //(new JavaTreeMapPerf).perf()                          // 196 ops/ms
-    //(new ScalaMapOfSortedMapPerf).perf()                  // 530 ops/ms
-    //(new ScalaMutableMapOfSortedMapPerf).perf()           // 627 ops/ms
-    //(new ScalaSortedMapPerf).perf()                       // 258 ops/ms
-
-    // Fastest
-    // Trove bloats code but not significantly faster.
-    //(new TroveHashMapOfTreeMapPerf).perf()                // 767 ops/ms
-    (new JavaHashMapOfTreeMapPerf).perf()                   // 730 ops/ms
-
-    //
-    // Single-threaded scheduler measurements.
-    //
-
-    //(new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
-    //(new SimpleQueuePerf).perf()                          //  90 ops/ms
-    //(new ShardedQueuePerf).perf()                         //  91 ops/ms
-    //(new JCToolsQueuePerf).perf()                         //  93 ops/ms
-
-    //
-    // Multithreaded measurements.
-    //
-
-    //(new JavaConcurrentSkipListMapPerf).perf()            // 208 ops/ms
-    //(new SynchronizedTablePerf).perf()                    // 298 ops/ms
-    //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
-    //(new SingleThreadShardedTablePerf).perf()             //  34 ops/ms
-    //(new FutureSharededTablePerf).perf()                  //  51 ops/ms
-    //(new CollectorSharededTablePerf).perf()               //  50 ops/ms
-    //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
-
-    // Fastest multithreaded approach.
-    (new SynchronizedShardedTablePerf).perf()               // 531 ops/ms
-
+    val results = new PerfResults
+    for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
+      unthreaded (results, nbrokers)
+    for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
+      queues (results, nbrokers)
+    for (nshards <- Seq (1, 2, 4, 8, 16))
+      for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
+        concurrent (results, nshards, nbrokers)
+    println ("--")
+    println (results)
   }}

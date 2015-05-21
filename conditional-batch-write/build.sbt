@@ -14,3 +14,5 @@ libraryDependencies ++= Seq (
   "net.sf.trove4j" % "trove4j" % "3.0.3",
   "org.scalatest" %% "scalatest" % "2.2.4",
   "org.jctools" % "jctools-core" % "1.0")
+
+test in assembly := {}
