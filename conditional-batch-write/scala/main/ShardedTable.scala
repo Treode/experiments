@@ -93,5 +93,5 @@ trait NewSingleThreadShardedTable extends NewTable {
 
   def parallel = true
 
-  def newTable = ShardedTable.synchronizedShards (nlocks, nshards)
+  def newTable = ShardedTable.singleThreadShards (nlocks, nshards)
 }

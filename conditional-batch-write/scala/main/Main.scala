@@ -99,10 +99,9 @@ object Main {
     //(new SingleThreadExecutorJavaHashMapOfTreeMapPerf).perf() //  93 ops/ms
     //(new SynchronizedJavaHashMapOfTreeMapPerf).perf()     // 298 ops/ms
     //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
+    //(new SingleThreadShardedTablePerf).perf()             //  34 ops/ms
 
     // Fastest multithreaded approach.
-    // SingleThreadExecutorJavaHashMapOfTreeMapPerf cause concern for SingleThreadShardedTablePerf.
-    //(new SingleThreadShardedTablePerf).perf()             // 521 ops/ms
     (new SynchronizedShardedTablePerf).perf()               // 531 ops/ms
 
   }}
