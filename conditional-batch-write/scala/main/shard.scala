@@ -1,7 +1,7 @@
 package experiments
 
 import java.lang.{Integer => JInt}
-import java.util.concurrent.{Callable, Executors, ExecutionException}
+import java.util.concurrent.Future
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 /** A shard of the hash table. Whereas Table provides conditional batch write directly, this
@@ -75,7 +75,7 @@ class ReadWriteShard (shard: Shard) extends Shard {
   def close(): Unit = ()
 }
 
-/** Use `SingleThreadedExecutor` to make the shard thread safe. */
+/** Use `SingleThreadedScheduler` to make the shard thread safe. */
 class SingleThreadShard (shard: Shard, scheduler: SingleThreadScheduler) extends Shard {
 
   def read (t: Int, k: Int): Value =
@@ -172,4 +172,87 @@ trait NewSingleThreadShardedTable extends NewTable {
 
   def newTable =
     ShardedTable (nlocks, nshards) (new SingleThreadShard (newRecommendedShard, newRecommendedScheduler))
+}
+
+/** A shard that returns futures. */
+class FutureShard (shard: Shard, scheduler: SingleThreadScheduler) {
+
+  def read (t: Int, k: Int): Future [Value] =
+    scheduler.submit (shard.read (t, k))
+
+  def prepare (r: Row): Future [Int] =
+    scheduler.submit (shard.prepare (r))
+
+  def commit (t: Int, r: Row): Unit =
+    scheduler.execute (shard.commit (t, r))
+
+  def scan (t: Int): Future [Seq [Cell]] =
+    scheduler.submit (shard.scan (t: Int))
+
+  def close(): Unit =
+    scheduler.shutdown()
+}
+
+/** Shard the key space over many tables. */
+class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => FutureShard) extends Table {
+
+  private val shards = Array.fill (mask + 1) (newShard)
+
+  def time = lock.time
+
+  private def read (t: Int, k: Int): Future [Value] =
+    shards (k & mask) .read (t, k)
+
+  def read (t: Int, ks: Int*): Seq [Value] = {
+    lock.read (t, ks)
+    ks.map (read (t, _)) .map (_.get)
+  }
+
+  private def prepare (r: Row): Future [Int] =
+    shards (r.k & mask) .prepare (r)
+
+  private def prepare (t: Int, rs: Seq [Row]) {
+    val max = rs.map (prepare (_)) .map (_.get) .max
+    if (max > t) throw new StaleException (t, max)
+  }
+
+  private def commit (t: Int, r: Row): Unit =
+    shards (r.k & mask) .commit (t, r)
+
+  private def commit (t: Int, rs: Seq [Row]): Unit =
+    rs foreach (commit (t, _))
+
+  def write (t: Int, rs: Row*): Int = {
+    val wt = lock.write (lock.time, rs) + 1
+    try {
+      prepare (t, rs)
+      commit (wt, rs)
+      wt
+    } finally {
+      lock.release (wt, rs)
+    }}
+
+  def scan(): Seq [Cell] = {
+    val now = lock.time
+    lock.scan (now)
+    shards.map (_.scan (now)) .map (_.get) .flatten.toSeq
+  }
+
+  def close(): Unit =
+    shards foreach (_.close())
+}
+
+object FutureShardedTable {
+
+  def apply (nlocks: Int, nshards: Int) (newShard: => FutureShard): FutureShardedTable = {
+    require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
+    new FutureShardedTable (LockSpace (nlocks), nshards - 1) (newShard)
+  }}
+
+trait NewFutureShardedTable extends NewTable {
+
+  def parallel = true
+
+  def newTable =
+    FutureShardedTable (nlocks, nshards) (new FutureShard (newRecommendedShard, newRecommendedScheduler))
 }

@@ -82,7 +82,7 @@ class ScalaSortedMapSpec extends TableBehaviors with NewScalaSortedMap
 class TroveHashMapOfTreeMapSpec extends TableBehaviors with NewTroveHashMapOfTreeMap
 
 //
-// Single-Threaded Scheduler Strategies, using JavaHashMapOfTreeMap
+// Single-Threaded Scheduler Strategies
 //
 
 class SingleThreadExecutorSpec extends TableBehaviors with NewSingleThreadExecutorTable
@@ -97,8 +97,6 @@ class JCToolsQueueSpec extends TableBehaviors with NewJCToolsQueueTable
 // Thread-Safe Strategies
 //
 
-class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
-
 class JavaConcurrentSkipListMapSpec extends TableBehaviors with NewJavaConcurrentSkipListMap
 
 class SynchronizedTableSpec extends TableBehaviors with NewSynchronizedTable
@@ -108,3 +106,7 @@ class SynchronizedShardedTableSpec extends TableBehaviors with NewSynchronizedSh
 class ReadWriteShardedTableSpec extends TableBehaviors with NewReadWriteShardedTable
 
 class SingleThreadShardedTableSpec extends TableBehaviors with NewSingleThreadShardedTable
+
+class FutureShardedTableSpec extends TableBehaviors with NewFutureShardedTable
+
+class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable

@@ -73,8 +73,6 @@ class JCToolsQueuePerf extends TablePerf with NewJCToolsQueueTable
 // Thread-Safe Strategies
 //
 
-class DisruptorTablePerf extends TablePerf with NewDisruptorTable
-
 class JavaConcurrentSkipListMapPerf extends TablePerf with NewJavaConcurrentSkipListMap
 
 class SynchronizedTablePerf extends TablePerf with NewSynchronizedTable
@@ -84,6 +82,10 @@ class SynchronizedShardedTablePerf extends TablePerf with NewSynchronizedSharded
 class ReadWriteShardedTablePerf extends TablePerf with NewReadWriteShardedTable
 
 class SingleThreadShardedTablePerf extends TablePerf with NewSingleThreadShardedTable
+
+class FutureSharededTablePerf extends TablePerf with NewFutureShardedTable
+
+class DisruptorTablePerf extends TablePerf with NewDisruptorTable
 
 object Main {
 
@@ -109,7 +111,7 @@ object Main {
     // Single-threaded scheduler measurements.
     //
 
-    //(new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
+    (new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
     //(new SimpleQueuePerf).perf()                          //  90 ops/ms
     //(new ShardedQueuePerf).perf()                         //  91 ops/ms
     //(new JCToolsQueuePerf).perf()                         //  93 ops/ms
@@ -118,11 +120,12 @@ object Main {
     // Multithreaded measurements.
     //
 
-    //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
     //(new JavaConcurrentSkipListMapPerf).perf()            // 208 ops/ms
     //(new SynchronizedTablePerf).perf()                    // 298 ops/ms
     //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
     //(new SingleThreadShardedTablePerf).perf()             //  34 ops/ms
+    //(new FutureSharededTablePerf).perf()                  //  51 ops/ms
+    //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
 
     // Fastest multithreaded approach.
     (new SynchronizedShardedTablePerf).perf()               // 531 ops/ms
