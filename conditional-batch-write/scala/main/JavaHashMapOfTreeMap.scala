@@ -106,3 +106,12 @@ trait NewSimpleQueueJavaHashMapOfTreeMap extends NewTable {
     new JavaHashMapOfTreeMap (naccounts),
     SingleThreadScheduler.usingSimpleQueue)
 }
+
+trait NewShardedQueueJavaHashMapOfTreeMap extends NewTable {
+
+  def parallel = true
+
+  def newTable = new SingleThreadTable (
+    new JavaHashMapOfTreeMap (naccounts),
+    SingleThreadScheduler.usingShardedQueue (nshards))
+}

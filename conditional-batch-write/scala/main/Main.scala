@@ -59,6 +59,8 @@ class SingleThreadShardedTablePerf extends TablePerf with NewSingleThreadSharded
 
 class SimpleQueueJavaHashMapOfTreeMapPerf extends TablePerf with NewSimpleQueueJavaHashMapOfTreeMap
 
+class ShardedQueueJavaHashMapOfTreeMapPerf extends TablePerf with NewShardedQueueJavaHashMapOfTreeMap
+
 class JavaTreeMapPerf extends TablePerf with NewJavaTreeMap
 
 class ScalaMapOfSortedMapPerf extends TablePerf with NewScalaMapOfSortedMap
@@ -95,8 +97,9 @@ object Main {
 
     //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
     //(new JavaConcurrentSkipListMapPerf).perf()            // 208 ops/ms
-    //(new SimpleQueueJavaHashMapOfTreeMapPerf).perf()      //  90 ops/ms
     //(new SingleThreadExecutorJavaHashMapOfTreeMapPerf).perf() //  93 ops/ms
+    //(new SimpleQueueJavaHashMapOfTreeMapPerf).perf()      //  90 ops/ms
+    //(new ShardedQueueJavaHashMapOfTreeMapPerf).perf()     //  91 ops/ms
     //(new SynchronizedJavaHashMapOfTreeMapPerf).perf()     // 298 ops/ms
     //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
     //(new SingleThreadShardedTablePerf).perf()             //  34 ops/ms

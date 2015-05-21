@@ -1,5 +1,6 @@
 package experiments
 
+import java.lang.{Integer => JInt}
 import java.util.ArrayDeque
 import java.util.concurrent._
 
@@ -39,6 +40,92 @@ class SimpleQueue [A] extends Queue [A] {
         wait()
       q.remove()
     }}
+
+/** A queue that shards the input side to reduce contention. */
+class ShardedQueue [A] private (mask: Int) extends Queue [A] {
+
+  import ShardedQueue.{InputQueue, NonEmpty}
+
+  private val nonEmpty = new NonEmpty (mask)
+  private val in = Array.tabulate (mask + 1) (new InputQueue [A] (nonEmpty, _))
+  private var out = new ArrayDeque [A]
+
+  /** Use the thread id to choose the input queue. */
+  private def id: Long =
+    Thread.currentThread.getId
+
+  def enqueue (v: A): Unit =
+    // Enqueue it into the appropriate shard.
+    in (id.toInt & mask) .enqueue (v)
+
+  def dequeue(): A =
+    // If we exhausted the output queue, await a non-empty input queue.
+    synchronized {
+      if (out.isEmpty) {
+        val n = nonEmpty.await()
+        out = in (n) .swap (out)
+      }
+      out.remove()
+    }}
+
+object ShardedQueue {
+
+  /** Track if one or more queues are not empty. */
+  class NonEmpty (mask: Int) {
+
+    require (mask < 64, "Can track only 64 queues")
+
+    private var bits = 0L
+    private var next = mask
+
+    /** Input `n` became non-empty. */
+    def filled (n: Int): Unit =
+      synchronized {
+        val bit = 1L << n
+        require ((bits & bit) == 0)
+        bits |= bit
+        notify()
+      }
+
+    /** Await the next non-empty queue and return its number. */
+    def await(): Int =
+      synchronized {
+        while (bits == 0L)
+          wait()
+        while (true) {
+          next = (next + 1) & mask
+          val bit = 1L << next
+          if ((bits & bit) > 0) {
+            bits ^= bit
+            return next
+          }}
+        return -1
+      }}
+
+  /** Swaps queues rather than dequeue. */
+  class InputQueue [A] (nonEmpty: NonEmpty, n: Int) {
+
+    private var q = new ArrayDeque [A]
+
+    def enqueue (v: A): Unit =
+      synchronized {
+        val wasEmpty = q.isEmpty
+        q.add (v)
+        if (wasEmpty)
+          nonEmpty.filled (n)
+      }
+
+    def swap (newq: ArrayDeque [A]): ArrayDeque [A] =
+      synchronized {
+        val oldq = q
+        q = newq
+        oldq
+      }}
+
+  def apply [A] (nshards: Int): ShardedQueue [A] = {
+    require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
+    new ShardedQueue (nshards - 1)
+  }}
 
 object SingleThreadScheduler {
 
@@ -96,4 +183,6 @@ object SingleThreadScheduler {
   def usingSimpleQueue(): SingleThreadScheduler =
     new UsingQueue (new SimpleQueue)
 
+  def usingShardedQueue (nshards: Int): SingleThreadScheduler =
+    new UsingQueue (ShardedQueue (nshards))
 }

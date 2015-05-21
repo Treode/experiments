@@ -215,9 +215,7 @@ object LockSpace {
 
   private class MultiLock (mask: Int) extends LockSpace {
 
-    private val locks = new Array [Lock] (mask + 1)
-    for (i <- 0 to mask)
-      locks (i) = new Lock
+    private val locks = Array.fill (mask + 1) (new Lock)
 
     private var _time = 0
 

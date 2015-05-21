@@ -75,7 +75,9 @@ class SynchronizedJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSynchr
 
 class SingleThreadJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSingleThreadExecutorJavaHashMapOfTreeMap
 
-class QueuedJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSimpleQueueJavaHashMapOfTreeMap
+class SimpleQueueJavaHashMapOfTreeMapSpec extends TableBehaviors with NewSimpleQueueJavaHashMapOfTreeMap
+
+class ShardedQueueJavaHashMapOfTreeMapSpec extends TableBehaviors with NewShardedQueueJavaHashMapOfTreeMap
 
 class JavaTreeMapSpec extends TableBehaviors with NewJavaTreeMap
 
