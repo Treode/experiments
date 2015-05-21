@@ -85,6 +85,8 @@ class SingleThreadShardedTablePerf extends TablePerf with NewSingleThreadSharded
 
 class FutureSharededTablePerf extends TablePerf with NewFutureShardedTable
 
+class CollectorSharededTablePerf extends TablePerf with NewCollectorShardedTable
+
 class DisruptorTablePerf extends TablePerf with NewDisruptorTable
 
 object Main {
@@ -111,7 +113,7 @@ object Main {
     // Single-threaded scheduler measurements.
     //
 
-    (new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
+    //(new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
     //(new SimpleQueuePerf).perf()                          //  90 ops/ms
     //(new ShardedQueuePerf).perf()                         //  91 ops/ms
     //(new JCToolsQueuePerf).perf()                         //  93 ops/ms
@@ -125,6 +127,7 @@ object Main {
     //(new ReadWriteShardedTablePerf).perf()                // 182 ops/ms
     //(new SingleThreadShardedTablePerf).perf()             //  34 ops/ms
     //(new FutureSharededTablePerf).perf()                  //  51 ops/ms
+    //(new CollectorSharededTablePerf).perf()               //  50 ops/ms
     //(new DisruptorTablePerf).perf()                       //   5 ops/ms, 5!!!
 
     // Fastest multithreaded approach.

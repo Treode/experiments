@@ -1,7 +1,8 @@
 package experiments
 
 import java.lang.{Integer => JInt}
-import java.util.concurrent.Future
+import java.util.concurrent.{CountDownLatch, Future}
+import java.util.concurrent.atomic.AtomicReferenceArray
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 /** A shard of the hash table. Whereas Table provides conditional batch write directly, this
@@ -255,4 +256,105 @@ trait NewFutureShardedTable extends NewTable {
 
   def newTable =
     FutureShardedTable (nlocks, nshards) (new FutureShard (newRecommendedShard, newRecommendedScheduler))
+}
+
+/** Collect `n` results. */
+class Collector [A: Manifest] (n: Int) {
+
+  private val vs = new Array [A] (n)
+  private val count = new CountDownLatch (n)
+
+  /** Set the result for index `i`. */
+  def set (i: Int, v: A) {
+    vs (i) = v
+    count.countDown() // Memory barrier for array set above.
+  }
+
+  def result: Seq [A] = {
+    count.await() // Memory barrier for array read below.
+    vs.toSeq
+  }}
+
+/** A shard that sends its results to a collector. */
+class CollectorShard (shard: Shard, scheduler: SingleThreadScheduler) {
+
+  def read (t: Int, k: Int, i: Int, c: Collector [Value]): Unit =
+    scheduler.execute (c.set (i, shard.read (t, k)))
+
+  def prepare (r: Row, i: Int, c: Collector [Int]): Unit =
+    scheduler.execute (c.set (i, shard.prepare (r)))
+
+  def commit (t: Int, r: Row): Unit =
+    scheduler.execute (shard.commit (t, r))
+
+  def scan (t: Int, i: Int, c: Collector [Seq [Cell]]): Unit =
+    scheduler.submit (c.set (i, shard.scan (t: Int)))
+
+  def close(): Unit =
+    scheduler.shutdown()
+}
+
+/** Shard the key space over many tables. */
+class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => CollectorShard) extends Table {
+
+  private val shards = Array.fill (mask + 1) (newShard)
+
+  def time = lock.time
+
+  def read (t: Int, ks: Int*): Seq [Value] = {
+    lock.read (t, ks)
+    val c = new Collector [Value] (ks.size)
+    for ((k, i) <- ks.zipWithIndex)
+      shards (k & mask) .read (t, k, i, c)
+    c.result
+  }
+
+  private def prepare (t: Int, rs: Seq [Row]) {
+    val c = new Collector [Int] (rs.size)
+    for ((r, i) <- rs.zipWithIndex)
+      shards (r.k & mask) .prepare (r, i, c)
+    val max = c.result.max
+    if (max > t) throw new StaleException (t, max)
+  }
+
+  private def commit (t: Int, rs: Seq [Row]): Unit =
+    for (r <- rs)
+      shards (r.k & mask) .commit (t, r)
+
+  def write (t: Int, rs: Row*): Int = {
+    val wt = lock.write (lock.time, rs) + 1
+    try {
+      prepare (t, rs)
+      commit (wt, rs)
+      wt
+    } finally {
+      lock.release (wt, rs)
+    }}
+
+  def scan(): Seq [Cell] = {
+    val now = lock.time
+    lock.scan (now)
+    val c = new Collector [Seq [Cell]] (mask + 1)
+    for ((s, i) <- shards.zipWithIndex)
+      s.scan (now, i, c)
+    c.result.flatten.toSeq
+  }
+
+  def close(): Unit =
+    shards foreach (_.close())
+}
+
+object CollectorShardedTable {
+
+  def apply (nlocks: Int, nshards: Int) (newShard: => CollectorShard): CollectorShardedTable = {
+    require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
+    new CollectorShardedTable (LockSpace (nlocks), nshards - 1) (newShard)
+  }}
+
+trait NewCollectorShardedTable extends NewTable {
+
+  def parallel = true
+
+  def newTable =
+    CollectorShardedTable (nlocks, nshards) (new CollectorShard (newRecommendedShard, newRecommendedScheduler))
 }
