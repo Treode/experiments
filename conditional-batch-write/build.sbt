@@ -12,4 +12,5 @@ scalacOptions ++= Seq ("-deprecation", "-feature", "-optimize", "-unchecked")
 libraryDependencies ++= Seq (
   "com.lmax" % "disruptor" % "3.2.0",
   "net.sf.trove4j" % "trove4j" % "3.0.3",
-  "org.scalatest" %% "scalatest" % "2.2.4")
+  "org.scalatest" %% "scalatest" % "2.2.4",
+  "org.jctools" % "jctools-core" % "1.0")

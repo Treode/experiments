@@ -91,6 +91,8 @@ class SimpleQueueSpec extends TableBehaviors with NewSimpleQueueTable
 
 class ShardedQueueSpec extends TableBehaviors with NewShardedQueueTable
 
+class JCToolsQueueSpec extends TableBehaviors with NewJCToolsQueueTable
+
 //
 // Thread-Safe Strategies
 //

@@ -67,6 +67,8 @@ class SimpleQueuePerf extends TablePerf with NewSimpleQueueTable
 
 class ShardedQueuePerf extends TablePerf with NewShardedQueueTable
 
+class JCToolsQueuePerf extends TablePerf with NewJCToolsQueueTable
+
 //
 // Thread-Safe Strategies
 //
@@ -110,6 +112,7 @@ object Main {
     //(new SingleThreadExecutorPerf).perf()                 //  93 ops/ms
     //(new SimpleQueuePerf).perf()                          //  90 ops/ms
     //(new ShardedQueuePerf).perf()                         //  91 ops/ms
+    //(new JCToolsQueuePerf).perf()                         //  93 ops/ms
 
     //
     // Multithreaded measurements.

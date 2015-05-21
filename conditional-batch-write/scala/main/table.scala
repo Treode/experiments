@@ -168,6 +168,15 @@ trait NewShardedQueueTable extends NewTable {
     SingleThreadScheduler.newUsingShardedQueue (nshards))
 }
 
+trait NewJCToolsQueueTable extends NewTable {
+
+  def parallel = true
+
+  def newTable = new SingleThreadTable (
+    newRecommendedTable,
+    SingleThreadScheduler.newUsingJCToolsQueue)
+}
+
 /** Methods to support functional and performance testing of the implementations. */
 trait TableTools {
   this: NewTable =>
