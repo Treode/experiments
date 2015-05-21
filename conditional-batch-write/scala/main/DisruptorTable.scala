@@ -295,5 +295,5 @@ trait NewDisruptorTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new DisruptorTable (1, 2)
+  def newTable = new DisruptorTable (nlocks, nshards)
 }

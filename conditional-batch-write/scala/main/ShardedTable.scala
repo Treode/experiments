@@ -79,19 +79,19 @@ trait NewSynchronizedShardedTable extends NewTable {
 
   def parallel = true
 
-  def newTable = ShardedTable.synchronizedShards (8, 8)
+  def newTable = ShardedTable.synchronizedShards (nlocks, nshards)
 }
 
 trait NewReadWriteShardedTable extends NewTable {
 
   def parallel = true
 
-  def newTable = ShardedTable.readWriteShards (8, 8)
+  def newTable = ShardedTable.readWriteShards (nlocks, nshards)
 }
 
 trait NewSingleThreadShardedTable extends NewTable {
 
   def parallel = true
 
-  def newTable = ShardedTable.synchronizedShards (8, 8)
+  def newTable = ShardedTable.synchronizedShards (nlocks, nshards)
 }

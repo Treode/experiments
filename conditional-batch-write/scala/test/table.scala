@@ -6,6 +6,10 @@ import org.scalatest.FlatSpec
 trait TableBehaviors extends FlatSpec with TableTools {
   this: NewTable =>
 
+  val nlocks = 8
+  val nshards = 8
+  val naccounts = 100
+
   def assertSeq [A] (expected: A*) (actual: Seq [A]): Unit =
     assertResult (expected) (actual)
 

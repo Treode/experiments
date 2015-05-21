@@ -1,5 +1,46 @@
 package experiments
 
+/** Repeat transfers experiments until
+  * - `count` execute within `tolerance` of the running mean time,
+  * - ntrials execute,
+  * whichever comes first.
+  *
+  * Report measurements that are within `tolerance` of the running mean time.
+  */
+trait TablePerf extends TableTools {
+  this: NewTable =>
+
+  val nlocks = 8
+  val nshards = 8
+  val naccounts = 100
+
+  val ntrials = 2000
+  val count = 20
+  val tolerance = 0.05
+
+  def perf() {
+
+    println (getClass.getName)
+
+    val M = 1000000.toDouble
+    var sum = 0.toDouble
+    var hits = count
+
+    for (trial <- 0 until ntrials) {
+      val ns = withTable (transfers (_, parallel)) .toDouble
+      val ops = (nbrokers * ntransfers).toDouble
+      val x = ops / ns * M
+      sum += x
+      val n = (trial + 1).toDouble
+      val mean = sum / n
+      val dev = math.abs (x - mean) / mean
+      if (dev <= tolerance) {
+        println (f"$trial%5d: $x%8.2f ops/ms ($mean%8.2f)")
+        hits -= 1
+        if (hits == 0)
+          return
+      }}}}
+
 class DisruptorTablePerf extends TablePerf with NewDisruptorTable
 
 class JavaConcurrentSkipListMapPerf extends TablePerf with NewJavaConcurrentSkipListMap

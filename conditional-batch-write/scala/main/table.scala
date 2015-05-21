@@ -76,8 +76,9 @@ trait Table {
 /** Factory to make tables. */
 trait NewTable {
 
-  /** A hint on how many buckets for hash tables. */
-  val naccounts = 100
+  val nlocks: Int
+  val nshards: Int
+  val naccounts: Int
 
   /** Is this implementation safe to use from multiple threads? */
   def parallel: Boolean
@@ -124,12 +125,10 @@ class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends
     scheduler.shutdown()
 }
 
-
 /** Methods to support functional and performance testing of the implementations. */
 trait TableTools {
   this: NewTable =>
 
-  val ntrials = 2000
   val nbrokers = 8
   val ntransfers = 1000
 
@@ -195,33 +194,3 @@ trait TableTools {
   def transfers (parallel: Boolean): Long =
     withTable (transfers (_, parallel))
 }
-
- /** Repeat transfers experiments until 20 execute within 5% of the running mean time. */
-trait TablePerf extends TableTools {
-  this: NewTable =>
-
-  val count = 20
-  val tolerance = 0.05
-
-  def perf() {
-
-    println (getClass.getName)
-
-    val M = 1000000.toDouble
-    var sum = 0.toDouble
-    var hits = count
-
-    for (trial <- 0 until ntrials) {
-      val ns = withTable (transfers (_, parallel)) .toDouble
-      val ops = (nbrokers * ntransfers).toDouble
-      val x = ops / ns * M
-      sum += x
-      val n = (trial + 1).toDouble
-      val mean = sum / n
-      val dev = math.abs (x - mean) / mean
-      if (dev <= tolerance) {
-        println (f"$trial%5d: $x%8.2f ops/ms ($mean%8.2f)")
-        hits -= 1
-        if (hits == 0)
-          return
-      }}}}
