@@ -15,4 +15,6 @@ libraryDependencies ++= Seq (
   "org.scalatest" %% "scalatest" % "2.2.4",
   "org.jctools" % "jctools-core" % "1.0")
 
+assemblyJarName in assembly := "cbw.jar"
+
 test in assembly := {}
