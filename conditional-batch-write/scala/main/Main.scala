@@ -18,14 +18,20 @@ package experiments
 
 import scala.collection.mutable.Builder
 
-case class PerfParams (nshards: Int, nbrokers: Int) {
+case class PerfParams (platform: String, nshards: Int, nbrokers: Int) {
 
-  override def toString = s"nshards: $nshards, nbrokers: $nbrokers"
+  override def toString = s"platform: $platform, nshards: $nshards, nbrokers: $nbrokers"
 }
 
-case class PerfResult (name: String, nshards: Int, nbrokers: Int, result: Double) {
+case class PerfResult (name: String, platform: String, nshards: Int, nbrokers: Int, result: Double) {
 
-  override def toString = f"$name, $nshards, $nbrokers, $result"
+  override def toString = f"$name, java, $platform, $nshards, $nbrokers, $result"
+}
+
+object PerfResult {
+
+  def apply (name: String, p: PerfParams, result: Double): PerfResult =
+    new PerfResult (name, p.platform, p.nshards, p.nbrokers, result)
 }
 
 class PerfResults {
@@ -36,7 +42,7 @@ class PerfResults {
     results ::= result
 
   override def toString: String =
-    "name, nshards, nbrokers, ops/ms\n" + (results.reverse mkString "\n")
+    "name, language, platform, nshards, nbrokers, ops/ms\n" + (results.reverse mkString "\n")
 }
 
 /** Repeat transfers experiments until
@@ -85,17 +91,19 @@ class TablePerf (implicit p: PerfParams) extends TableTools {
         println (f"$trial%5d: $x%8.2f ops/ms ($mean%8.2f)")
         hits -= 1
         if (hits == 0)
-          return PerfResult (name, p.nshards, p.nbrokers, mean)
+          return PerfResult (name, p, mean)
       }
       if (System.currentTimeMillis > limit)
-        return PerfResult (name, p.nshards, p.nbrokers, mean)
+        return PerfResult (name, p, mean)
     }
     val mean = sum / ntrials.toDouble
-    PerfResult (name, p.nshards, p.nbrokers, mean)
+    PerfResult (name, p, mean)
   }}
 
 //
 // Single-Threaded Strategies
+//
+// Cannot handle concurrent clients.
 //
 
 class JavaHashMapOfTreeMapPerf (implicit p: PerfParams)
@@ -119,6 +127,9 @@ class TroveHashMapOfTreeMapPerf (implicit p: PerfParams)
 //
 // Single-Threaded Scheduler Strategies
 //
+//
+// Queue tasks onto a single thread.
+//
 
 class SingleThreadExecutorPerf (implicit p: PerfParams)
   extends TablePerf with NewSingleThreadExecutorTable
@@ -134,6 +145,8 @@ class JCToolsQueuePerf (implicit p: PerfParams)
 
 //
 // Thread-Safe Strategies
+//
+// Handle concurrency some other way.
 //
 
 class JavaConcurrentSkipListMapPerf (implicit p: PerfParams)
@@ -163,10 +176,7 @@ class DisruptorTablePerf (implicit p: PerfParams)
 object Main {
 
   // Cannot handle concurrent clients.
-  def unthreaded (results: PerfResults, nbrokers: Int) {
-
-    implicit val params = PerfParams (1, nbrokers)
-
+  def unthreaded (results: PerfResults) (implicit params: PerfParams) {
     results += (new JavaHashMapOfTreeMapPerf).perf()
     results += (new JavaTreeMapPerf).perf()
     results += (new ScalaMapOfSortedMapPerf).perf()
@@ -176,21 +186,15 @@ object Main {
   }
 
   // Queue tasks onto a single thread.
-  def queues (results: PerfResults, nbrokers: Int) {
-
-    implicit val params = PerfParams (1, nbrokers)
-
+  def queues (results: PerfResults) (implicit params: PerfParams) {
     results += (new SingleThreadExecutorPerf).perf()
     results += (new SimpleQueuePerf).perf()
     results += (new ShardedQueuePerf).perf()
     results += (new JCToolsQueuePerf).perf()
   }
 
-  // Handle concurrent some other way.
-  def concurrent (results: PerfResults, nshards: Int, nbrokers: Int) {
-
-    implicit val params = PerfParams (nshards, nbrokers)
-
+  // Handle concurrency some other way.
+  def concurrent (results: PerfResults) (implicit params: PerfParams) {
     results += (new SynchronizedTablePerf).perf()
     results += (new JavaConcurrentSkipListMapPerf).perf()
     results += (new SynchronizedShardedTablePerf).perf()
@@ -203,14 +207,22 @@ object Main {
   }
 
   def main (args: Array [String]) {
+
+    val platform =
+      if (args.length > 0) args (0) else "unknown"
+
     val results = new PerfResults
+
     for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
-      unthreaded (results, nbrokers)
+      unthreaded (results) (PerfParams (platform, 1, nbrokers))
+
     for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
-      queues (results, nbrokers)
+      queues (results) (PerfParams (platform, 1, nbrokers))
+
     for (nshards <- Seq (1, 2, 4, 8, 16))
       for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
-        concurrent (results, nshards, nbrokers)
+        concurrent (results) (PerfParams (platform, nshards, nbrokers))
+
     println ("--")
     println (results)
   }}
