@@ -29,6 +29,10 @@ class JavaTreeMap extends Table {
 
   private var clock = 0
 
+  private def raise (t: Int): Unit =
+    if (clock < t)
+      clock = t
+
   def time = clock
 
   private def read (t: Int, k: Int): Value = {
@@ -41,8 +45,10 @@ class JavaTreeMap extends Table {
     return Value (v, t2)
   }
 
-  def read (t: Int, ks: Int*): Seq [Value] =
+  def read (t: Int, ks: Int*): Seq [Value] = {
+    raise (t)
     ks map (read (t, _))
+  }
 
   private def prepare (r: Row): Int = {
     val i = table.tailMap (Key (r.k, Int.MaxValue))
@@ -69,6 +75,7 @@ class JavaTreeMap extends Table {
   }
 
   def write (t: Int, rs: Row*): Int = {
+    raise (t)
     prepare (t, rs)
     commit (rs)
   }

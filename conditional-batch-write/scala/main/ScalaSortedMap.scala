@@ -28,6 +28,10 @@ class ScalaSortedMap extends Table {
 
   private var clock = 0
 
+  private def raise (t: Int): Unit =
+    if (clock < t)
+      clock = t
+
   def time = clock
 
   private def read (t: Int, k: Int): Value = {
@@ -40,8 +44,10 @@ class ScalaSortedMap extends Table {
     return Value (v, t2)
   }
 
-  def read (t: Int, ks: Int*): Seq [Value] =
+  def read (t: Int, ks: Int*): Seq [Value] = {
+    raise (t)
     ks map (read (t, _))
+  }
 
   private def prepare (r: Row): Int = {
     val i = table.iteratorFrom (Key (r.k, Int.MaxValue))
@@ -68,6 +74,7 @@ class ScalaSortedMap extends Table {
   }
 
   def write (t: Int, rs: Row*): Int = {
+    raise (t)
     prepare (t, rs)
     commit (rs)
   }

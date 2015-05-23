@@ -29,6 +29,10 @@ class JavaHashMapOfTreeMap (hint: Int = 16) extends Shard with Table {
 
   private var clock = 0
 
+  private def raise (t: Int): Unit =
+    if (clock < t)
+      clock = t
+
   def time = clock
 
   def read (t: Int, k: Int): Value = {
@@ -42,8 +46,10 @@ class JavaHashMapOfTreeMap (hint: Int = 16) extends Shard with Table {
     return Value (v, Int.MaxValue - x2)
   }
 
-  def read (t: Int, ks: Int*): Seq [Value] =
+  def read (t: Int, ks: Int*): Seq [Value] = {
+    raise (t)
     ks map (read (t, _))
+  }
 
   def prepare (r: Row): Int = {
     val vs = table.get (r.k)
@@ -73,17 +79,20 @@ class JavaHashMapOfTreeMap (hint: Int = 16) extends Shard with Table {
   }
 
   def write (t: Int, rs: Row*): Int = {
+    raise (t)
     prepare (t, rs)
     commit (rs)
   }
 
-  def scan (t: Int): Seq [Cell] =
+  def scan (t: Int): Seq [Cell] = {
+    raise (t)
     for {
       (k, vs) <- table.toSeq
       (x, v) <- vs
       t2 = Int.MaxValue - x
       if t2 < t
     } yield Cell (k, v, t2)
+  }
 
   def scan(): Seq [Cell] =
     for ((k, vs) <- table.toSeq; (x, v) <- vs) yield Cell (k, v, Int.MaxValue - x)

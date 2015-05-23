@@ -31,6 +31,10 @@ class TroveHashMapOfTreeMap (hint: Int) extends Table {
 
   private var clock = 0
 
+  private def raise (t: Int): Unit =
+    if (clock < t)
+      clock = t
+
   def time = clock
 
   private def get (k: Int) = {
@@ -61,6 +65,7 @@ class TroveHashMapOfTreeMap (hint: Int) extends Table {
   }
 
   def read (t: Int, ks: Int*): Seq [Value] = {
+    raise (t)
     val x = Int.MaxValue - t
     ks map (read (x, _))
   }
@@ -88,6 +93,7 @@ class TroveHashMapOfTreeMap (hint: Int) extends Table {
   }
 
   def write (t: Int, rs: Row*): Int = {
+    raise (t)
     prepare (t, rs)
     commit (rs)
   }
