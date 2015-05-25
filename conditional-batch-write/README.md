@@ -2,11 +2,13 @@
 
 This code explores different ways we might implement conditional batch write.
 
-It only examines in-memory approaches. It does not consider durably storing changes on disk, nor replicating changes to other machines. Later, we may check how those concerns affect the performance of different options. It only looks at Scala/Java. Later, we may try some implementations in other languages.
+It only examines in-memory approaches. It does not consider durably storing changes on disk, nor replicating changes to other machines. Later, we may check how those concerns affect the performance of different options. 
+
+It investigates many approaches in Scala/Java. We have started on some in C++.
 
 You can read more about the conditional batch write and our test method in the [design document][design].
 
-You can [see our results][results]. Undoubtedly, there are ways to improve those numbers.
+You can [see our results][results] for the Scala/Java tests. Undoubtedly, there are ways to improve those numbers.
 
 ### Running the Scala Tests
 
@@ -17,6 +19,16 @@ git clone git@github.com:Treode/experiments.git
 cd experiments/conditional-batch-write/scala
 sbt assembly
 java -jar target/scala-2.11/cbw.jar
+```
+
+### Running the C++ Tests
+
+You’ll need `make` and `g++`.
+
+```sh
+git clone git@github.com:Treode/experiments.git
+cd experiments/conditional-batch-write/cpp
+make runperf
 ```
 
 ### Contributing
