@@ -3,9 +3,9 @@ name := "conditional-batch-write"
 
 scalaVersion := "2.11.6"
 
-scalaSource in Compile := baseDirectory.value / "scala/main"
+scalaSource in Compile := baseDirectory.value / "src"
 
-scalaSource in Test := baseDirectory.value / "scala/test"
+scalaSource in Test := baseDirectory.value / "tests"
 
 scalacOptions ++= Seq ("-deprecation", "-feature", "-optimize", "-unchecked")
 
