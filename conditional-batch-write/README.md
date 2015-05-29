@@ -4,11 +4,11 @@ This code explores different ways we might implement conditional batch write.
 
 It only examines in-memory approaches. It does not consider durably storing changes on disk, nor replicating changes to other machines. Later, we may check how those concerns affect the performance of different options. 
 
-It investigates many approaches in Scala/Java. We have started on some in C++.
+It investigates many approaches in [Scala][scala-lang]. We have started on some in C++ and [Rust][rust-lang].
 
 You can read more about the conditional batch write and our test method in the [design document][design].
 
-You can [see our results][results] for the Scala/Java tests. Undoubtedly, there are ways to improve those numbers.
+You can [see our results][results] for the Scala tests. Undoubtedly, there are ways to improve those numbers. The C++ tests perform similarly, though without needing JIT warmup. Rust performs poorly; we’re probably using it wrong.
 
 ### Running the Scala Tests
 
@@ -31,6 +31,16 @@ cd experiments/conditional-batch-write/cpp
 make runperf
 ```
 
+### Running the Rust Tests
+
+You’ll need the [nightly version][rust-nightly] of `cargo`.
+
+```sh
+git clone git@github.com:Treode/experiments.git
+cd experiments/conditional-batch-write/rust
+cargo run --release
+```
+
 ### Contributing
 
 Feel free to use GitHub issues to ask questions or suggest improvements. Also, feel free to submit a pull request, however please sign the [contributor license agreement][cla-individual] first. If your employer has rights your intellectual property, your employer will need to sign the [Corporate CLA][cla-corporate].
@@ -42,5 +52,11 @@ Feel free to use GitHub issues to ask questions or suggest improvements. Also, f
 [design]: DESIGN.md "Conditional Batch Write"
 
 [results]: https://docs.google.com/spreadsheets/d/1_D93mvOwuUifNcDMpLt6JjXo0HkHWjmE7Si9aPby48E/edit?usp=sharing "Results"
+
+[rust-lang]: http://www.rust-lang.org/ "The Rust Programming Language"
+
+[rust-nightly]: http://doc.rust-lang.org/book/nightly-rust.html "Nightly Rust"
+
+[scala-lang]: http://scala-lang.org/ "The Scala Programming Language"
 
 [sbt]: http://www.scala-sbt.org/ "SBT"

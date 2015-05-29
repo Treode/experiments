@@ -1,0 +1,9 @@
+[package]
+
+name = "perf"
+version = "0.0.1"
+authors = [ "Topher <topher@treode.com>" ]
+
+[dependencies]
+rand = "*"
+time = "*"
