@@ -15,9 +15,9 @@ class CppUnorderedMapOfMap: public Table {
       return clock;
     }
 
-    std::vector<Value> read(uint32_t t, std::initializer_list<int> ks);
+    void read(uint32_t t, size_t n, const int *ks, Value *vs);
 
-    uint32_t write(uint32_t t, std::initializer_list<Row> rs);
+    uint32_t write(uint32_t t, size_t n, const Row *rs);
 
     std::vector<Cell> scan() const;
 
@@ -36,11 +36,11 @@ class CppUnorderedMapOfMap: public Table {
 
     int prepare(const Row &r) const;
 
-    void prepare(uint32_t t, std::initializer_list<Row> rs) const;
+    void prepare(uint32_t t, size_t n, const Row *rs) const;
 
     void commit(uint32_t t, const Row &r);
 
-    uint32_t commit(const std::initializer_list<Row> rs);
+    uint32_t commit(size_t n, const Row *rs);
 };
 
 #endif // CPP_UNORDERED_MAP_OF_MAP_HPP

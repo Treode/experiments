@@ -5,6 +5,7 @@
 #include "table.hpp"
 
 using std::ostream;
+using std::vector;
 
 ostream &operator<<(ostream &os, const Value &v) {
   os << "Value(" << v.v << ", " << v.t << ")";
@@ -53,9 +54,12 @@ void broker(Table &table, unsigned ntransfers) {
     auto n = ramt(reng);
 
     auto rt = table.time();
-    auto vs = table.read(rt, {a1, a2});
+    int ks[] = {a1, a2};
+    Value vs[2];
+    table.read(rt, 2, ks, vs);
     try {
-      table.write(rt, {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)});
+      Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
+      table.write(rt, 2, rs);
     } catch (stale_exception e) {
       // ignored
     }

@@ -6,32 +6,14 @@
 #include <stdexcept>
 #include <vector>
 
-/** A table (or key-value table, hash table) using conditional batch write. Keys and values are
-  * integers to keep this simple, because our focus is on comparing performance of different
-  * implementation options.
-  */
-// class Table {
-
-//   int time();
-
-//   /** Read keys `ks` as of time `t`. */
-//   vector<value> read(int t, vector<int> ks);
-
-//   * Write rows `rs` if they haven't changed since time `t`.
-//   int write(int t, vector<row> rs);
-
-//   /** Scan the entire history. This is not part of the performance timings. */
-//   vector<cell> scan();
-
-//   void close();
-// };
-
 struct Value {
 
-  const int v;
-  const uint32_t t;
+  int v;
+  uint32_t t;
 
-  constexpr Value(int _v, uint32_t _t): v(_v), t(_t) {}
+  Value() {}
+
+  Value(int _v, uint32_t _t): v(_v), t(_t) {}
 };
 
 std::ostream &operator<<(std::ostream &os, const Value &v);
@@ -94,11 +76,21 @@ class Table {
 
     virtual uint32_t time() const = 0;
 
-    virtual std::vector<Value> read(uint32_t t, std::initializer_list<int> ks) = 0;
+    virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) = 0;
 
-    virtual uint32_t write(uint32_t t, std::initializer_list<Row> rs) = 0;
+    virtual uint32_t write(uint32_t t, size_t n, const Row *rs) = 0;
 
     virtual std::vector<Cell> scan() const =  0;
+
+    std::vector<Value> read(uint32_t t, const std::vector<int> &ks) {
+      auto vs = std::vector<Value>(ks.size());
+      read(t, ks.size(), ks.data(), vs.data());
+      return vs;
+    }
+
+    uint32_t write(uint32_t t, const std::vector<Row> &rs) {
+      return write(t, rs.size(), rs.data());
+    }
 };
 
 std::ostream &operator<<(std::ostream &os, const Table &table);

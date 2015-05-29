@@ -19,12 +19,10 @@ inline Value CppUnorderedMapOfMap::read(uint32_t t, int k) const {
   return Value(j->second, UINT32_MAX - j->first);
 }
 
-vector<Value> CppUnorderedMapOfMap::read(uint32_t t, initializer_list<int> ks) {
+void CppUnorderedMapOfMap::read(uint32_t t, size_t n, const int *ks, Value *vs) {
   raise(t);
-  vector<Value> vs;
-  for (auto k: ks)
-    vs.push_back(read(t, k));
-  return vs;
+  for (size_t i = 0; i < n; ++i)
+    vs[i] = read(t, ks[i]);
 }
 
 inline int CppUnorderedMapOfMap::prepare(const Row &r) const {
@@ -34,10 +32,10 @@ inline int CppUnorderedMapOfMap::prepare(const Row &r) const {
   return UINT32_MAX - i->second.begin()->first;
 }
 
-inline void CppUnorderedMapOfMap::prepare(uint32_t t, initializer_list<Row> rs) const {
+inline void CppUnorderedMapOfMap::prepare(uint32_t t, size_t n, const Row *rs) const {
   uint32_t max = 0;
-  for (auto r: rs) {
-    auto t2 = prepare(r);
+  for (size_t i = 0; i < n; ++i) {
+    auto t2 = prepare(rs[i]);
     if (max < t2)
       max = t2;
   }
@@ -49,17 +47,17 @@ inline void CppUnorderedMapOfMap::commit(uint32_t t, const Row &r) {
   table[r.k][UINT32_MAX - t] = r.v;
 }
 
-inline uint32_t CppUnorderedMapOfMap::commit(initializer_list<Row> rs) {
+inline uint32_t CppUnorderedMapOfMap::commit(size_t n, const Row *rs) {
   auto t = ++clock;
-  for (auto r : rs)
-    commit (clock, r);
+  for (size_t i = 0; i < n; ++i)
+    commit (clock, rs[i]);
   return clock;
 }
 
-uint32_t CppUnorderedMapOfMap::write(uint32_t t, initializer_list<Row> rs) {
+uint32_t CppUnorderedMapOfMap::write(uint32_t t, size_t n, const Row *rs) {
   raise(t);
-  prepare(t, rs);
-  return commit(rs);
+  prepare(t, n, rs);
+  return commit(n, rs);
 }
 
 vector<Cell> CppUnorderedMapOfMap::scan() const {
