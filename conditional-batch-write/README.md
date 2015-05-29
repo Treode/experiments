@@ -2,13 +2,11 @@
 
 This code explores different ways we might implement conditional batch write.
 
-It only examines in-memory approaches. It does not consider durably storing changes on disk, nor replicating changes to other machines. Later, we may check how those concerns affect the performance of different options. 
-
-It investigates many approaches in [Scala][scala-lang]. We have started on some in C++ and [Rust][rust-lang].
+It only examines in-memory approaches. It does not consider durably storing changes on disk, nor replicating changes to other machines. Later, we may check how those concerns affect the performance of different options. It investigates many approaches in [Scala][scala-lang]. We have started on some in C++ and [Rust][rust-lang].
 
 You can read more about the conditional batch write and our test method in the [design document][design].
 
-You can [see our results][results] for the Scala tests. Undoubtedly, there are ways to improve those numbers. The C++ tests perform similarly, though without needing JIT warmup. Rust performs poorly; we’re probably using it wrong.
+You can see our most recent [formal results][results] for the Scala tests. We ran these on quiet machines with no other undue workload. Undoubtedly, there are ways to improve those numbers. The informal C++ tests perform better, and without needing JIT warmup. Rust performs poorly; we’re probably using it wrong. We ran these tests off-hand on a desktop with open browsers, editors, and so on.
 
 ### Running the Scala Tests
 

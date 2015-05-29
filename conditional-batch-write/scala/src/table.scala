@@ -63,10 +63,10 @@ object Cell extends Ordering [Cell] {
     x compare y
 }
 
-class StaleException (condition: Int, maximum: Int) extends Exception {
+class StaleException (cond: Int, max: Int) extends Exception {
 
   override def getMessage: String =
-    s"Stale write; condition: $condition, maximum: $maximum."
+    s"Stale write; cond: $cond, max: $max."
 }
 
 /** A table (or key-value table, hash table) using conditional batch write. Keys and values are

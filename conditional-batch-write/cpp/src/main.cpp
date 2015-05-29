@@ -8,10 +8,13 @@ using std::endl;
 
 int main() {
 
-  int nhits = 20;
-  int ntrials = 2000;
-  int nclocks = 60 * CLOCKS_PER_SEC;
+  unsigned nhits = 20;
+  unsigned ntrials = 2000;
+  unsigned nclocks = 60 * CLOCKS_PER_SEC;
+  unsigned ntransfers = 1000;
+  unsigned nbrokers = 8;
   double tolerance = 0.05;
+  double ops = ntransfers * nbrokers;
 
   double sum = 0.0;
 
@@ -22,11 +25,10 @@ int main() {
   ) {
     CppUnorderedMapOfMap table;
     auto start = clock();
-    for (int i = 0; i < 8; ++i)
-      broker(table);
+    for (int i = 0; i < nbrokers; ++i)
+      broker(table, ntransfers);
     auto end = clock();
     double us = end - start;
-    double ops = 1000 * 8;
     double x = ops / us * (CLOCKS_PER_SEC / 1000);
     sum += x;
     double n = trial + 1;
@@ -35,8 +37,6 @@ int main() {
     if (dev <= tolerance) {
       cout << trial << " " << x << " ops/ms (" << mean << ")" << endl;
       ++hits;
-    } else {
-      cout << trial << " " << x << " ops/ms (" << mean << " nope)" << endl;
     }
   }
 }

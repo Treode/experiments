@@ -61,6 +61,6 @@ TEST_CASE("A table should reject a stale write", "[table]") {
 
 TEST_CASE("A table should preserve the money supply running serially", "[table]") {
   CppUnorderedMapOfMap table;
-  broker(table);
+  broker(table, 1000);
   expectMoneyConserved(table);
 }

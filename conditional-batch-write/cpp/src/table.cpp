@@ -40,9 +40,7 @@ ostream &operator<<(ostream &os, const Table &table) {
   return os;
 }
 
-void broker(Table &table) {
-
-  unsigned ntransfers = 1000;
+void broker(Table &table, unsigned ntransfers) {
 
   std::default_random_engine reng;
   std::uniform_int_distribution<int> racct(0, 100);

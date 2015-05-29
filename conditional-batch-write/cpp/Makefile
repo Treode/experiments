@@ -25,7 +25,7 @@ target/perf: $(OBJS)
 	-mkdir target
 	g++ $(CFLAGS) $^ -o $@
 
-target/test: $(filter-out src/perf.o, $(OBJS)) $(TEST_OBJS)
+target/test: $(filter-out src/main.o, $(OBJS)) $(TEST_OBJS)
 	-mkdir target
 	g++ $(CFLAGS) $^ -o $@
 

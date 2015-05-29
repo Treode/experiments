@@ -67,8 +67,8 @@ class TablePerf (implicit p: PerfParams) extends TableTools {
   val nseconds = 60
   val count = 20
   val tolerance = 0.05
-
-  val M = 1000000.toDouble
+  val ops = (nbrokers * ntransfers).toDouble
+  val million = (1000 * 1000).toDouble
 
   def perf(): PerfResult = {
 
@@ -81,8 +81,7 @@ class TablePerf (implicit p: PerfParams) extends TableTools {
 
     for (trial <- 0 until ntrials) {
       val ns = withTable (transfers (_, parallel)) .toDouble
-      val ops = (nbrokers * ntransfers).toDouble
-      val x = ops / ns * M
+      val x = ops / ns * million
       sum += x
       val n = (trial + 1).toDouble
       val mean = sum / n

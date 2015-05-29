@@ -77,12 +77,12 @@ class stale_exception: public std::runtime_error {
 
   public:
 
-    uint32_t condition, maximum;
+    uint32_t cond, max;
 
-    stale_exception (uint32_t _condition, uint32_t _maximum):
+    stale_exception (uint32_t _cond, uint32_t _max):
       runtime_error ("stale"),
-      condition (_condition),
-      maximum (_maximum)
+      cond (_cond),
+      max (_max)
     {}
 };
 
@@ -103,6 +103,6 @@ class Table {
 
 std::ostream &operator<<(std::ostream &os, const Table &table);
 
-void broker(Table &table);
+void broker(Table &table, unsigned ntransfers);
 
 #endif // TABLE_HPP
