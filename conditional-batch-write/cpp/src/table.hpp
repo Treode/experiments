@@ -13,7 +13,7 @@ struct Value {
 
   Value() {}
 
-  Value(int _v, uint32_t _t): v(_v), t(_t) {}
+  constexpr Value(int _v, uint32_t _t): v(_v), t(_t) {}
 };
 
 std::ostream &operator<<(std::ostream &os, const Value &v);
@@ -26,7 +26,7 @@ inline bool operator!=(const Value &x, const Value &y) {
 
 struct Row {
 
-  const int k, v;
+  int k, v;
 
   constexpr Row(int _k, int _v): k(_k), v(_v) {}
 };
@@ -41,8 +41,8 @@ inline bool operator!=(const Row &x, const Row &y) {
 
 struct Cell {
 
-  const int k, v;
-  const uint32_t t;
+  int k, v;
+  uint32_t t;
 
   constexpr Cell(int _k, int _v, uint32_t _t): k(_k), v(_v), t(_t) {}
 };
