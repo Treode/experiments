@@ -55,8 +55,11 @@ private class Lock {
   /** A reader wants to acquire the lock; the lock will ensure no future writer commits at or
     * before that timestamp.
     */
-  def read (time: Int): Unit =
+  def read (time: Int) {
     sync.acquireShared (time << 1)
+    // Allow next parked thread to also proceed.
+    sync.releaseShared (0)
+  }
 
   /** A writer wants to acquire the lock; the lock provides the logical time, and the writer must
     * commit strictly after that time. The writer must eventuall call `release`.
@@ -102,14 +105,14 @@ object Lock {
       while (true) {
         val state = getState
         val held = (state & 1) == 1
-        // If held, then loop.
-        if (!held) {
-          // Use the greater of our forecast or state.
-          val next = if (state <= forecast) forecast else (state | 1)
-          if (compareAndSetState (state, next)) {
-            setExclusiveOwnerThread (Thread.currentThread)
-            return true
-          }}}
+        if (held)
+          return false
+        // Use the greater of our forecast or state.
+        val next = if (state <= forecast) forecast else (state | 1)
+        if (compareAndSetState (state, next)) {
+          setExclusiveOwnerThread (Thread.currentThread)
+          return true
+        }}
       return false
     }
 
@@ -144,15 +147,19 @@ object Lock {
       while (true) {
         val state = getState
         val held = (state & 1) == 1
-        // If held by a writer that may write before our forecasted time, then loop.
-        if (!held || forecast < state) {
-          // Use the greater of our forecast or state.
-          val next = if (state <= forecast) forecast else state
-          if (compareAndSetState (state, next)) {
-            return 1
-          }}}
+        if (held)
+          return -1;
+        if (forecast <= state)
+          return 1;
+        if (compareAndSetState (state, forecast))
+          return 1
+      }
       return -1
-    }}}
+    }
+
+    override def tryReleaseShared (ignored: Int): Boolean =
+      true
+  }}
 
 /** It's easy to shard the lock space. */
 trait LockSpace {

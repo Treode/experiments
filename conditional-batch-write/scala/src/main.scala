@@ -16,6 +16,8 @@
 
 package experiments
 
+import java.lang.Integer.{bitCount, highestOneBit}
+import java.lang.Runtime.getRuntime
 import scala.collection.mutable.Builder
 
 case class PerfParams (platform: String, nshards: Int, nbrokers: Int) {
@@ -174,6 +176,12 @@ class DisruptorTablePerf (implicit p: PerfParams)
 
 object Main {
 
+  // Powers of 2, from 1 to availableProcessors (or next power of 2).
+  val shards =
+    Seq.tabulate (bitCount (highestOneBit (getRuntime.availableProcessors) - 1) + 1) (1 << _)
+
+  val brokers = Seq (2, 4, 8, 16, 32, 64)
+
   // Cannot handle concurrent clients.
   def unthreaded (results: PerfResults) (implicit params: PerfParams) {
     results += (new JavaHashMapOfTreeMapPerf).perf()
@@ -201,8 +209,7 @@ object Main {
     results += (new SingleThreadShardedTablePerf).perf()
     results += (new FutureShardedTablePerf).perf()
     results += (new CollectorShardedTablePerf).perf()
-    //Fails under stress.
-    //results += (new DisruptorTablePerf).perf()
+    results += (new DisruptorTablePerf).perf()
   }
 
   def main (args: Array [String]) {
@@ -212,14 +219,13 @@ object Main {
 
     val results = new PerfResults
 
-    for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
-      unthreaded (results) (PerfParams (platform, 1, nbrokers))
+    unthreaded (results) (PerfParams (platform, 1, 1))
 
-    for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
+    for (nbrokers <- brokers)
       queues (results) (PerfParams (platform, 1, nbrokers))
 
-    for (nshards <- Seq (1, 2, 4, 8, 16))
-      for (nbrokers <- Seq (2, 4, 8, 16, 32, 64))
+    for (nshards <- shards)
+      for (nbrokers <- brokers)
         concurrent (results) (PerfParams (platform, nshards, nbrokers))
 
     println ("--")

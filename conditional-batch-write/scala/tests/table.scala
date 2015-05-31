@@ -112,6 +112,6 @@ class SingleThreadShardedTableSpec extends TableBehaviors with NewSingleThreadSh
 
 class FutureShardedTableSpec extends TableBehaviors with NewFutureShardedTable
 
-class ColelctorShardedTableSpec extends TableBehaviors with NewCollectorShardedTable
+class CollectorShardedTableSpec extends TableBehaviors with NewCollectorShardedTable
 
 class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
