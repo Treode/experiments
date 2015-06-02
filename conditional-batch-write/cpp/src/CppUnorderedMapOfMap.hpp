@@ -7,7 +7,7 @@
 
 #include "table.hpp"
 
-class CppUnorderedMapOfMap: public Table {
+class CppUnorderedMapOfMap: public Table, Shard {
 
   public:
 
@@ -15,9 +15,17 @@ class CppUnorderedMapOfMap: public Table {
       return clock;
     }
 
+    Value read (uint32_t t, int k) const;
+
     void read(uint32_t t, size_t n, const int *ks, Value *vs);
 
+    uint32_t prepare(const Row &r) const;
+
+    void commit(uint32_t t, const Row &r);
+
     uint32_t write(uint32_t t, size_t n, const Row *rs);
+
+    std::vector<Cell> scan (uint32_t t);
 
     std::vector<Cell> scan() const;
 
@@ -32,13 +40,7 @@ class CppUnorderedMapOfMap: public Table {
         clock = t;
     }
 
-    Value read(uint32_t t, int k) const;
-
-    int prepare(const Row &r) const;
-
     void prepare(uint32_t t, size_t n, const Row *rs) const;
-
-    void commit(uint32_t t, const Row &r);
 
     uint32_t commit(size_t n, const Row *rs);
 };

@@ -9,7 +9,7 @@ using std::initializer_list;
 using std::ostream;
 using std::vector;
 
-inline Value CppUnorderedMapOfMap::read(uint32_t t, int k) const {
+Value CppUnorderedMapOfMap::read(uint32_t t, int k) const {
   auto i = table.find(k);
   if (i == table.end())
     return Value(0, 0);
@@ -25,7 +25,7 @@ void CppUnorderedMapOfMap::read(uint32_t t, size_t n, const int *ks, Value *vs) 
     vs[i] = read(t, ks[i]);
 }
 
-inline int CppUnorderedMapOfMap::prepare(const Row &r) const {
+inline uint32_t CppUnorderedMapOfMap::prepare(const Row &r) const {
   auto i = table.find(r.k);
   if (i == table.end())
     return 0;

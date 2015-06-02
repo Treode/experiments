@@ -97,4 +97,19 @@ std::ostream &operator<<(std::ostream &os, const Table &table);
 
 void broker(Table &table, unsigned ntransfers);
 
+class Shard {
+
+  public:
+
+    virtual ~Shard() = default;
+
+    virtual Value read (uint32_t t, int k) const = 0;
+
+    //virtual uint32_t prepare (const Row &r) const = 0;
+
+    //virtual void commit (uint32_t t, const Row &r) = 0;
+
+    //virtual std::vector<Cell> scan (uint32_t t) = 0;
+};
+
 #endif // TABLE_HPP
