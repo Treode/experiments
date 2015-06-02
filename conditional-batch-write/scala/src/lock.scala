@@ -18,9 +18,6 @@ package experiments
 
 import java.lang.{Integer => JInt}
 import java.util.Arrays
-import java.util.concurrent.locks.AbstractQueuedSynchronizer
-
-import org.scalatest.FlatSpec
 
 /** A reader/writer lock that uses a logical clock.
   *
@@ -38,28 +35,14 @@ import org.scalatest.FlatSpec
   * can get a value as-of some read time, even if there may be a concurrent writer, so long as that
   * writer uses a write time greater than the read time.
   */
-private class Lock {
+trait Lock {
 
-  /** The state of the `AbstractQueuedSynchronizer` is
-    * {{{
-    * (logical_time << 1) | (exclusively_held)
-    * }}}
-    * It encodes both the logical time and whether or not a writer holds the lock. Both the Sync
-    * instance and this Lock instance work with the form the state.
-    */
-  private val sync = new Lock.Sync
-
-  def time: Int =
-    sync.getTime
+  def time: Int
 
   /** A reader wants to acquire the lock; the lock will ensure no future writer commits at or
     * before that timestamp.
     */
-  def read (time: Int) {
-    sync.acquireShared (time << 1)
-    // Allow next parked thread to also proceed.
-    sync.releaseShared (0)
-  }
+  def read (time: Int)
 
   /** A writer wants to acquire the lock; the lock provides the logical time, and the writer must
     * commit strictly after that time. The writer must eventuall call `release`.
@@ -67,99 +50,14 @@ private class Lock {
     * @param time The forecasted time; this may raise the logical time.
     * @return The logical time; the writer must commit using a timestamp strictly after this time.
     */
-  def write (time: Int): Int = {
-    sync.acquire ((time << 1) | 1)
-    return sync.getTime
-  }
+  def write (time: Int): Int
 
   /** A writer is finished with the lock.
     *
     * @param time The write time; this may raise the logical time.
     */
-  def release (time: Int): Unit =
-    sync.release ((time << 1) & (-1 << 1))
-
-  override def toString: String =
-    s"Lock(${sync.getTime})"
+  def release (time: Int) 
 }
-
-object Lock {
-
-  /** See comment on the field Lock.sync. */
-  private [Lock] class Sync extends AbstractQueuedSynchronizer {
-
-    def getTime: Int =
-      // The time is in the upper 63 bits.
-      getState >>> 1
-
-    override def isHeldExclusively(): Boolean =
-      // The lowest bit indicates if a writer holds the lock.
-      (getState & 1) == 1
-
-    /** A writer wants to acquire the lock. If the lock is not held by another writer, raise the
-      * logical time and grant the lock.
-      */
-    override def tryAcquire (forecast: Int): Boolean = {
-      // The lock class should set this up for us.
-      assert ((forecast & 1) == 1)
-      while (true) {
-        val state = getState
-        val held = (state & 1) == 1
-        if (held)
-          return false
-        // Use the greater of our forecast or state.
-        val next = if (state <= forecast) forecast else (state | 1)
-        if (compareAndSetState (state, next)) {
-          setExclusiveOwnerThread (Thread.currentThread)
-          return true
-        }}
-      return false
-    }
-
-    override def tryRelease (forecast: Int): Boolean = {
-      assert ((forecast & 1) == 0)
-      while (true) {
-        val state = getState
-        // Use the greater of our forecast or state.
-        val next = if (state <= forecast) forecast else (state & (-1 << 1))
-        if (compareAndSetState (state, next)) {
-          // We WIN!
-          setExclusiveOwnerThread (null)
-          return true
-        }}
-      return false
-    }
-
-    /** A reader wants to acquire the lock.
-      *
-      * If the reader's timestamp is
-      *
-      * - less than or equal to the logical time, grant the lock.
-      *
-      * - greater than the logical time and the lock is free, raise the logical time and grant the
-      *   lock.
-      *
-      * - greater than the logical time and a writer holds the lock, then block the reader.
-      */
-    override def tryAcquireShared (forecast: Int): Int = {
-      // The lock class should set this up for us.
-      assert ((forecast & 1) == 0)
-      while (true) {
-        val state = getState
-        val held = (state & 1) == 1
-        if (held)
-          return -1;
-        if (forecast <= state)
-          return 1;
-        if (compareAndSetState (state, forecast))
-          return 1
-      }
-      return -1
-    }
-
-    override def tryReleaseShared (ignored: Int): Boolean =
-      true
-  }}
 
 /** It's easy to shard the lock space. */
 trait LockSpace {
@@ -182,9 +80,7 @@ trait LockSpace {
 
 object LockSpace {
 
-  private class SingleLock extends LockSpace {
-
-    private val lock = new Lock
+  private class SingleLock (lock: Lock) extends LockSpace {
 
     def time = lock.time
 
@@ -213,6 +109,7 @@ object LockSpace {
     ns
   }
 
+  // Visible for testing.
   def maskRows (mask: Int, rs: Seq [Row]): Array [Int] = {
     val ns = new Array [Int] (rs.length)
     var i = 0
@@ -224,6 +121,7 @@ object LockSpace {
     ns
   }
 
+  // Visible for testing.
   def foreach (ns: Seq [Int]) (f: Int => Any) {
     var i = 0
     var n = -1
@@ -236,10 +134,9 @@ object LockSpace {
       i += 1
     }}
 
-  private class MultiLock (mask: Int) extends LockSpace {
+  private class MultiLock (locks: Array [Lock]) extends LockSpace {
 
-    private val locks = Array.fill (mask + 1) (new Lock)
-
+    private val mask = locks.size - 1
     private var _time = 0
 
     private def raise (t: Int): Unit =
@@ -282,10 +179,10 @@ object LockSpace {
         i += 1
       }}}
 
-  def apply (nlocks: Int): LockSpace =
+  def apply (nlocks: Int) (newLock: => Lock): LockSpace =
     if (nlocks == 1) {
-      new SingleLock
+      new SingleLock (newLock)
     } else {
       require (JInt.highestOneBit (nlocks) == nlocks, "nlocks must be a power of two")
-      new MultiLock (nlocks - 1)
+      new MultiLock (Array.fill (nlocks) (newLock))
     }}

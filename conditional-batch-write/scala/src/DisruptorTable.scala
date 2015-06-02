@@ -226,14 +226,13 @@ object EventAwait extends EventHandler [TableEvent] {
       }
     }}}
 
-class DisruptorTable (nlocks: Int, nshards: Int) extends Table {
+class DisruptorTable (lock: LockSpace, nshards: Int) extends Table {
 
   require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
 
   private val executor = Executors.newCachedThreadPool()
   private val disruptor = new Disruptor (new TableFactory (nshards), 1024, executor)
   private val ring = disruptor.getRingBuffer
-  private val lock = LockSpace (nlocks)
 
   {
     val mask = nshards - 1
@@ -311,5 +310,5 @@ trait NewDisruptorTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new DisruptorTable (nlocks, nshards)
+  def newTable = new DisruptorTable (AqsLock.space (nlocks), nshards)
 }

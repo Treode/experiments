@@ -162,9 +162,9 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
 
 object ShardedTable {
 
-  def apply (nlocks: Int, nshards: Int) (newShard: => Shard): ShardedTable = {
+  def apply (lock: LockSpace, nshards: Int) (newShard: => Shard): ShardedTable = {
     require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
-    new ShardedTable (LockSpace (nlocks), nshards - 1) (newShard)
+    new ShardedTable (lock, nshards - 1) (newShard)
   }}
 
 trait NewSynchronizedShardedTable extends NewTable {
@@ -172,7 +172,7 @@ trait NewSynchronizedShardedTable extends NewTable {
   def parallel = true
 
   def newTable =
-    ShardedTable (nlocks, nshards) (new SynchronizedShard (newRecommendedShard))
+    ShardedTable (AqsLock.space (nlocks), nshards) (new SynchronizedShard (newRecommendedShard))
 }
 
 trait NewReadWriteShardedTable extends NewTable {
@@ -180,7 +180,7 @@ trait NewReadWriteShardedTable extends NewTable {
   def parallel = true
 
   def newTable =
-    ShardedTable (nlocks, nshards) (new ReadWriteShard (newRecommendedShard))
+    ShardedTable (AqsLock.space (nlocks), nshards) (new ReadWriteShard (newRecommendedShard))
 }
 
 trait NewSingleThreadShardedTable extends NewTable {
@@ -188,7 +188,7 @@ trait NewSingleThreadShardedTable extends NewTable {
   def parallel = true
 
   def newTable =
-    ShardedTable (nlocks, nshards) (new SingleThreadShard (newRecommendedShard, newRecommendedScheduler))
+    ShardedTable (AqsLock.space (nlocks), nshards) (new SingleThreadShard (newRecommendedShard, newRecommendedScheduler))
 }
 
 /** A shard that returns futures. */
@@ -261,9 +261,9 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
 
 object FutureShardedTable {
 
-  def apply (nlocks: Int, nshards: Int) (newShard: => FutureShard): FutureShardedTable = {
+  def apply (lock: LockSpace, nshards: Int) (newShard: => FutureShard): FutureShardedTable = {
     require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
-    new FutureShardedTable (LockSpace (nlocks), nshards - 1) (newShard)
+    new FutureShardedTable (lock, nshards - 1) (newShard)
   }}
 
 trait NewFutureShardedTable extends NewTable {
@@ -271,7 +271,7 @@ trait NewFutureShardedTable extends NewTable {
   def parallel = true
 
   def newTable =
-    FutureShardedTable (nlocks, nshards) (new FutureShard (newRecommendedShard, newRecommendedScheduler))
+    FutureShardedTable (AqsLock.space (nlocks), nshards) (new FutureShard (newRecommendedShard, newRecommendedScheduler))
 }
 
 /** Collect `n` results. */
@@ -362,9 +362,9 @@ class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => C
 
 object CollectorShardedTable {
 
-  def apply (nlocks: Int, nshards: Int) (newShard: => CollectorShard): CollectorShardedTable = {
+  def apply (lock: LockSpace, nshards: Int) (newShard: => CollectorShard): CollectorShardedTable = {
     require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
-    new CollectorShardedTable (LockSpace (nlocks), nshards - 1) (newShard)
+    new CollectorShardedTable (lock, nshards - 1) (newShard)
   }}
 
 trait NewCollectorShardedTable extends NewTable {
@@ -372,5 +372,5 @@ trait NewCollectorShardedTable extends NewTable {
   def parallel = true
 
   def newTable =
-    CollectorShardedTable (nlocks, nshards) (new CollectorShard (newRecommendedShard, newRecommendedScheduler))
+    CollectorShardedTable (AqsLock.space (nlocks), nshards) (new CollectorShard (newRecommendedShard, newRecommendedScheduler))
 }

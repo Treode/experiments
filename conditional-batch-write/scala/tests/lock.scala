@@ -2,7 +2,9 @@ package experiments
 
 import org.scalatest.FlatSpec
 
-class LockSpec extends FlatSpec {
+trait LockBehaviors extends FlatSpec {
+
+  def newLock: Lock
 
   /** Run `action` in a new thread. */
   def thread (action: => Any): Thread = {
@@ -14,8 +16,8 @@ class LockSpec extends FlatSpec {
     t
   }
 
-  "A Lock" should "block a later writer" in {
-    val lock = new Lock
+  "A lock" should "block a later writer" in {
+    val lock = newLock
     lock.write (1)
     thread {
       assert (lock.write (2) == 2)
@@ -24,7 +26,7 @@ class LockSpec extends FlatSpec {
   }
 
   it should "block a later writer and raise the time" in {
-    val lock = new Lock
+    val lock = newLock
     lock.write (1)
     thread {
       assert (lock.write (2) == 3)
@@ -33,7 +35,7 @@ class LockSpec extends FlatSpec {
   }
 
   it should "block an earlier writer and raise the time" in {
-    val lock = new Lock
+    val lock = newLock
     lock.write (2)
     thread {
       assert (lock.write (1) == 3)
@@ -42,7 +44,7 @@ class LockSpec extends FlatSpec {
   }
 
   it should "block a later reader" in {
-    val lock = new Lock
+    val lock = newLock
     @volatile var p = false
     lock.write (1)
     val t = thread {
@@ -56,7 +58,7 @@ class LockSpec extends FlatSpec {
   }
 
   it should "block a later reader and raise the time" in {
-    val lock = new Lock
+    val lock = newLock
     @volatile var p = false
     lock.write (1)
     val t = thread {
@@ -71,13 +73,18 @@ class LockSpec extends FlatSpec {
   }
 
   it should "allow an earlier reader" in {
-    val lock = new Lock
+    val lock = newLock
     lock.write (1)
     val t = thread {
       lock.read (1)
     }
     t.join (10)
   }}
+
+class AqsLockSpec extends LockBehaviors {
+
+  def newLock = new AqsLock
+}
 
 class LockSpaceSpec extends FlatSpec {
 

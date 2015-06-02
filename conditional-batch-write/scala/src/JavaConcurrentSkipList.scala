@@ -23,14 +23,9 @@ import scala.collection.JavaConversions._
   * chronological order, so searching for the ceiling of `(k, Int.MaxValue)` will find the most
   * recent value for the key. This is thread safe.
   */
-class JavaConcurrentSkipListMap (nlocks: Int) extends Table {
+class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
 
   private var table = new ConcurrentSkipListMap [Key, Int]
-
-  /** ConcurrentSkipList manages its data structure in a thread safe way. This lock lets prepare
-    * and commit do their job to impelement conditional batch write.
-    */
-  private val lock = LockSpace (nlocks)
 
   def time = lock.time
 
@@ -97,5 +92,5 @@ trait NewJavaConcurrentSkipListMap extends NewTable {
 
   def parallel = true
 
-  def newTable = new JavaConcurrentSkipListMap (nlocks)
+  def newTable = new JavaConcurrentSkipListMap (AqsLock.space (nlocks))
 }
