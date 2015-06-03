@@ -26,4 +26,28 @@ package object experiments {
       } catch {
         case t: ExecutionException =>
           throw t.getCause
-      }}}
+      }}
+
+  /** Get time from lock state. */
+  def getTime (s: Int): Int =
+    s >>> 1
+
+  /** Get held from lock state. */
+  def isHeld (s: Int): Boolean =
+    (s & 1) == 1
+
+  /** Pack lock state, from time `t` and held `h`, into a single int. */
+  def makeState (t: Int, h: Boolean): Int =
+    // Put held into lowest single bit, and time into remaining bits.
+    if (h)
+      (t << 1) | 1
+    else
+      (t << 1)
+
+  /** Set held to `h` on lock state `s`. */
+  def setHeld (s: Int, h: Boolean): Int =
+    if (h)
+      s | 1
+    else
+      s & -2
+}

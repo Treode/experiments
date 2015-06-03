@@ -21,31 +21,24 @@ import java.util.concurrent.locks.AbstractQueuedSynchronizer
 /** A Lock that uses Java's AbstractQueuedSynchronizer. */
 class AqsLock extends Lock {
 
-  /** The state of the `AbstractQueuedSynchronizer` is
-    * {{{
-    * (logical_time << 1) | (exclusively_held)
-    * }}}
-    * It encodes both the logical time and whether or not a writer holds the lock. Both the Sync
-    * instance and this Lock instance work with the form the state.
-    */
   private val sync = new AqsLock.Sync
 
   def time: Int =
     sync.getTime
 
   def read (time: Int) {
-    sync.acquireShared (time << 1)
+    sync.acquireShared (makeState (time, false))
     // Allow next parked thread to also proceed.
     sync.releaseShared (0)
   }
 
   def write (time: Int): Int = {
-    sync.acquire ((time << 1) | 1)
+    sync.acquire (makeState (time, true))
     return sync.getTime
   }
 
   def release (time: Int): Unit =
-    sync.release ((time << 1) & (-1 << 1))
+    sync.release (makeState (time, false))
 
   override def toString: String =
     s"Lock(${sync.getTime})"
@@ -57,26 +50,24 @@ object AqsLock {
   private [AqsLock] class Sync extends AbstractQueuedSynchronizer {
 
     def getTime: Int =
-      // The time is in the upper 63 bits.
-      getState >>> 1
+      experiments.getTime (getState)
 
     override def isHeldExclusively(): Boolean =
       // The lowest bit indicates if a writer holds the lock.
-      (getState & 1) == 1
+      isHeld (getState)
 
     /** A writer wants to acquire the lock. If the lock is not held by another writer, raise the
       * logical time and grant the lock.
       */
     override def tryAcquire (forecast: Int): Boolean = {
       // The lock class should set this up for us.
-      assert ((forecast & 1) == 1)
+      assert (isHeld (forecast))
       while (true) {
         val state = getState
-        val held = (state & 1) == 1
-        if (held)
+        if (isHeld (state))
           return false
         // Use the greater of our forecast or state.
-        val next = if (state <= forecast) forecast else (state | 1)
+        val next = if (state <= forecast) forecast else setHeld (state, true)
         if (compareAndSetState (state, next)) {
           setExclusiveOwnerThread (Thread.currentThread)
           return true
@@ -85,11 +76,11 @@ object AqsLock {
     }
 
     override def tryRelease (forecast: Int): Boolean = {
-      assert ((forecast & 1) == 0)
+      assert (!isHeld (forecast))
       while (true) {
         val state = getState
         // Use the greater of our forecast or state.
-        val next = if (state <= forecast) forecast else (state & (-1 << 1))
+        val next = if (state <= forecast) forecast else setHeld (state, false)
         if (compareAndSetState (state, next)) {
           // We WIN!
           setExclusiveOwnerThread (null)
@@ -111,14 +102,13 @@ object AqsLock {
       */
     override def tryAcquireShared (forecast: Int): Int = {
       // The lock class should set this up for us.
-      assert ((forecast & 1) == 0)
+      assert (!isHeld (forecast))
       while (true) {
         val state = getState
-        val held = (state & 1) == 1
-        if (held)
-          return -1;
         if (forecast <= state)
           return 1;
+        if (isHeld (state))
+          return -1;
         if (compareAndSetState (state, forecast))
           return 1
       }
