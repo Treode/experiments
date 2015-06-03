@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import java.util.Arrays
 import java.util.concurrent.{ExecutionException, Future}
 
 package object experiments {
@@ -50,4 +51,40 @@ package object experiments {
       s | 1
     else
       s & -2
-}
+
+  /** Mask keys in `ks` and then sort. */
+  def maskKeys (mask: Int, ks: Seq [Int]): Array [Int] = {
+    val ns = new Array [Int] (ks.length)
+    var i = 0
+    while (i < ks.length) {
+      ns (i) = ks (i) & mask
+      i += 1
+    }
+    Arrays.sort (ns)
+    ns
+  }
+
+  /** Mask keys in `rs` and then sort. */
+  def maskRows (mask: Int, rs: Seq [Row]): Array [Int] = {
+    val ns = new Array [Int] (rs.length)
+    var i = 0
+    while (i < rs.length) {
+      ns (i) = rs (i) .k & mask
+      i += 1
+    }
+    Arrays.sort (ns)
+    ns
+  }
+
+  /** Repeat `f` foreach int skipping duplicates. */
+  def foreach (ns: Seq [Int]) (f: Int => Any) {
+    var i = 0
+    var n = -1
+    while (i < ns.length) {
+      val m = ns (i)
+      if (m > n) {
+        f (m)
+        n = m
+      }
+      i += 1
+    }}}

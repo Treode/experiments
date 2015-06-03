@@ -85,20 +85,3 @@ class AqsLockSpec extends LockBehaviors {
 
   def newLock = new AqsLock
 }
-
-class LockSpaceSpec extends FlatSpec {
-
-  def foreachMasked (mask: Int, ks: Int*): Seq [Int] = {
-    val b = Seq.newBuilder [Int]
-    LockSpace.foreach (LockSpace.maskKeys (mask, ks)) (b += _)
-    b.result
-  }
-
-  "foreachMasked" should "work" in {
-    assert (foreachMasked (1) == Seq.empty)
-    assert (foreachMasked (1, 0) == Seq (0))
-    assert (foreachMasked (1, 1) == Seq (1))
-    assert (foreachMasked (1, 0, 2) == Seq (0))
-    assert (foreachMasked (3, 0, 2) == Seq (0, 2))
-    assert (foreachMasked (3, 2, 0) == Seq (0, 2))
-  }}

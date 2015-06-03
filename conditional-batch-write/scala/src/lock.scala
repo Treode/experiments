@@ -17,7 +17,6 @@
 package experiments
 
 import java.lang.{Integer => JInt}
-import java.util.Arrays
 
 /** A reader/writer lock that uses a logical clock.
   *
@@ -96,43 +95,6 @@ object LockSpace {
     def scan (t: Int): Unit =
       lock.read (t)
   }
-
-  // Visible for testing.
-  def maskKeys (mask: Int, ks: Seq [Int]): Array [Int] = {
-    val ns = new Array [Int] (ks.length)
-    var i = 0
-    while (i < ks.length) {
-      ns (i) = ks (i) & mask
-      i += 1
-    }
-    Arrays.sort (ns)
-    ns
-  }
-
-  // Visible for testing.
-  def maskRows (mask: Int, rs: Seq [Row]): Array [Int] = {
-    val ns = new Array [Int] (rs.length)
-    var i = 0
-    while (i < rs.length) {
-      ns (i) = rs (i) .k & mask
-      i += 1
-    }
-    Arrays.sort (ns)
-    ns
-  }
-
-  // Visible for testing.
-  def foreach (ns: Seq [Int]) (f: Int => Any) {
-    var i = 0
-    var n = -1
-    while (i < ns.length) {
-      val m = ns (i)
-      if (m > n) {
-        f (m)
-        n = m
-      }
-      i += 1
-    }}
 
   private class MultiLock (locks: Array [Lock]) extends LockSpace {
 
