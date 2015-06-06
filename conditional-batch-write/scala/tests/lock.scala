@@ -6,6 +6,21 @@ trait LockBehaviors extends FlatSpec {
 
   def newLock: Lock
 
+  def repeat (test: => Any) {
+    for (_ <- 0 until 100) {
+      test
+    }}
+
+  def assertAlive (t: Thread) {
+    Thread.sleep (10)
+    assert (t.isAlive)
+  }
+
+  def assertJoined (t: Thread) {
+    t.join (10)
+    assert (!t.isAlive)
+  }
+
   /** Run `action` in a new thread. */
   def thread (action: => Any): Thread = {
     val t = new Thread {
@@ -16,69 +31,69 @@ trait LockBehaviors extends FlatSpec {
     t
   }
 
-  "A lock" should "block a later writer" in {
+  "A lock" should "block a later writer" in repeat {
     val lock = newLock
     lock.write (1)
-    thread {
+    val t = thread {
       assert (lock.write (2) == 2)
     }
+    assertAlive (t)
     lock.release (2)
+    assertJoined (t)
   }
 
-  it should "block a later writer and raise the time" in {
+  it should "block a later writer and raise the time" in repeat {
     val lock = newLock
     lock.write (1)
-    thread {
+    val t = thread {
       assert (lock.write (2) == 3)
     }
+    assertAlive (t)
     lock.release (3)
+    assertJoined (t)
   }
 
-  it should "block an earlier writer and raise the time" in {
+  it should "block an earlier writer and raise the time" in repeat {
     val lock = newLock
     lock.write (2)
-    thread {
+    val t = thread {
       assert (lock.write (1) == 3)
     }
+    assertAlive (t)
     lock.release (3)
+    assertJoined (t)
   }
 
-  it should "block a later reader" in {
+  it should "block a later reader" in repeat {
     val lock = newLock
-    @volatile var p = false
     lock.write (1)
     val t = thread {
       lock.read (2)
-      p = true
     }
-    Thread.sleep (10)
-    assert (!p)
+    assertAlive (t)
     lock.release (2)
-    t.join (10)
+    assertJoined (t)
   }
 
-  it should "block a later reader and raise the time" in {
+  it should "block a later reader and raise the time" in repeat {
     val lock = newLock
-    @volatile var p = false
     lock.write (1)
     val t = thread {
       lock.read (3)
-      p = true
     }
-    Thread.sleep (10)
-    assert (!p)
+    assertAlive (t)
     lock.release (2)
-    t.join (10)
+    assertJoined (t)
     assert (lock.write (2) == 3)
   }
 
-  it should "allow an earlier reader" in {
+  it should "allow an earlier reader" in repeat {
     val lock = newLock
     lock.write (1)
     val t = thread {
       lock.read (1)
     }
-    t.join (10)
+    assertJoined (t)
   }}
 
 class AqsLockSpec extends LockBehaviors {
