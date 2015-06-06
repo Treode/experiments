@@ -100,3 +100,8 @@ class AqsLockSpec extends LockBehaviors {
 
   def newLock = new AqsLock
 }
+
+class ConditionLockSpec extends LockBehaviors {
+
+  def newLock = new ConditionLock
+}

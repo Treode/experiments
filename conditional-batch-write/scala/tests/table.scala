@@ -115,3 +115,9 @@ class FutureShardedTableSpec extends TableBehaviors with NewFutureShardedTable
 class CollectorShardedTableSpec extends TableBehaviors with NewCollectorShardedTable
 
 class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
+
+//
+// Alternative Logical-Lock strategies.
+//
+
+class ConditionLockTableSpec extends TableBehaviors with NewConditionLockTable

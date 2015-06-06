@@ -145,7 +145,7 @@ class JCToolsQueuePerf (implicit p: PerfParams)
   extends TablePerf with NewJCToolsQueueTable
 
 //
-// Thread-Safe Strategies
+// Thread-Safe Strategies, using AqsLock
 //
 // Handle concurrency some other way.
 //
@@ -173,6 +173,13 @@ class CollectorShardedTablePerf (implicit p: PerfParams)
 
 class DisruptorTablePerf (implicit p: PerfParams)
   extends TablePerf with NewDisruptorTable
+
+//
+// Alternative Logical-Lock strategies, using SynchronizedShardedTable
+//
+
+class ConditionLockPerf (implicit p: PerfParams)
+  extends TablePerf with NewConditionLockTable
 
 object Main {
 
@@ -212,6 +219,11 @@ object Main {
     results += (new DisruptorTablePerf).perf()
   }
 
+  // Alternative locking strategies.
+  def locks (results: PerfResults) (implicit params: PerfParams) {
+    results += (new ConditionLockPerf).perf()
+  }
+
   def main (args: Array [String]) {
 
     val platform =
@@ -227,6 +239,10 @@ object Main {
     for (nshards <- shards)
       for (nbrokers <- brokers)
         concurrent (results) (PerfParams (platform, nshards, nbrokers))
+
+    for (nshards <- shards)
+      for (nbrokers <- brokers)
+        locks (results) (PerfParams (platform, nshards, nbrokers))
 
     println ("--")
     println (results)

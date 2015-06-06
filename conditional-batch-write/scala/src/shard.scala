@@ -175,6 +175,14 @@ trait NewSynchronizedShardedTable extends NewTable {
     ShardedTable (AqsLock.space (nlocks), nshards) (new SynchronizedShard (newRecommendedShard))
 }
 
+trait NewConditionLockTable extends NewTable {
+
+  def parallel = true
+
+  def newTable =
+    ShardedTable (ConditionLock.space (nlocks), nshards) (new SynchronizedShard (newRecommendedShard))
+}
+
 trait NewReadWriteShardedTable extends NewTable {
 
   def parallel = true

@@ -18,7 +18,10 @@ package experiments
 
 import java.util.concurrent.locks.AbstractQueuedSynchronizer
 
-/** A Lock that uses Java's AbstractQueuedSynchronizer. */
+/** A Lock that uses Java's AbstractQueuedSynchronizer. 
+  *
+  * C++ does not have anything similar to AbstractQueuedSynchronizer.
+  */
 class AqsLock extends Lock {
 
   private val sync = new AqsLock.Sync
