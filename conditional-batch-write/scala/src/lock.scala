@@ -17,6 +17,7 @@
 package experiments
 
 import java.lang.{Integer => JInt}
+import java.util.concurrent.atomic.AtomicInteger
 
 /** A reader/writer lock that uses a logical clock.
   *
@@ -55,7 +56,7 @@ trait Lock {
     *
     * @param time The write time; this may raise the logical time.
     */
-  def release (time: Int) 
+  def release (time: Int)
 }
 
 /** It's easy to shard the lock space. */
@@ -99,14 +100,15 @@ object LockSpace {
   private class MultiLock (locks: Array [Lock]) extends LockSpace {
 
     private val mask = locks.size - 1
-    private var _time = 0
+    private var clock = new AtomicInteger (0)
 
-    private def raise (t: Int): Unit =
-      synchronized {
-        if (_time < t) _time = t
-      }
+    private def raise (time: Int) {
+      var now = clock.get
+      while (now < time && !clock.compareAndSet (now, time))
+        now = clock.get
+    }
 
-    def time = _time
+    def time = clock.get
 
     def read (t: Int, ks: Seq [Int]) {
       raise (t)
