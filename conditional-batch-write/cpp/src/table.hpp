@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -76,13 +77,13 @@ class Table {
 
     virtual uint32_t time() const = 0;
 
-    virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) = 0;
+    virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) const = 0;
 
     virtual uint32_t write(uint32_t t, size_t n, const Row *rs) = 0;
 
     virtual std::vector<Cell> scan() const =  0;
 
-    std::vector<Value> read(uint32_t t, const std::vector<int> &ks) {
+    std::vector<Value> read(uint32_t t, const std::vector<int> &ks) const {
       auto vs = std::vector<Value>(ks.size());
       read(t, ks.size(), ks.data(), vs.data());
       return vs;
@@ -103,13 +104,44 @@ class Shard {
 
     virtual ~Shard() = default;
 
-    virtual Value read (uint32_t t, int k) const = 0;
+    virtual Value read(uint32_t t, int k) const = 0;
 
-    //virtual uint32_t prepare (const Row &r) const = 0;
+    virtual uint32_t prepare(const Row &r) const = 0;
 
-    //virtual void commit (uint32_t t, const Row &r) = 0;
+    virtual void commit(uint32_t t, const Row &r) = 0;
 
-    //virtual std::vector<Cell> scan (uint32_t t) = 0;
+    virtual std::vector<Cell> scan(uint32_t t) const = 0;
+};
+
+// S is a shard
+template <typename S>
+class MutexShard: public Shard {
+
+  public:
+
+    Value read(uint32_t t, int k) const {
+      std::lock_guard<std::mutex> acqn(lock);
+      return shard.read(t, k);
+    }
+
+    uint32_t prepare(const Row &r) const {
+      std::lock_guard<std::mutex> acqn(lock);
+      return shard.prepare(r);
+    }
+
+    void commit(uint32_t t, const Row &r) {
+      std::lock_guard<std::mutex> acqn(lock);
+      shard.commit(t, r);
+    }
+
+    std::vector<Cell> scan(uint32_t t) const {
+      std::lock_guard<std::mutex> acqn(lock);
+      return shard.scan(t);
+    }
+
+  private:
+    S shard;
+    mutable std::mutex lock;
 };
 
 #endif // TABLE_HPP

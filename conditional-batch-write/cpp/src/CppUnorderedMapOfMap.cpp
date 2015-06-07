@@ -19,7 +19,7 @@ Value CppUnorderedMapOfMap::read(uint32_t t, int k) const {
   return Value(j->second, UINT32_MAX - j->first);
 }
 
-void CppUnorderedMapOfMap::read(uint32_t t, size_t n, const int *ks, Value *vs) {
+void CppUnorderedMapOfMap::read(uint32_t t, size_t n, const int *ks, Value *vs) const {
   raise(t);
   for (size_t i = 0; i < n; ++i)
     vs[i] = read(t, ks[i]);
@@ -40,7 +40,7 @@ inline void CppUnorderedMapOfMap::prepare(uint32_t t, size_t n, const Row *rs) c
       max = t2;
   }
   if (max > t)
-    throw stale_exception (t, max);
+    throw stale_exception(t, max);
 }
 
 inline void CppUnorderedMapOfMap::commit(uint32_t t, const Row &r) {
@@ -50,7 +50,7 @@ inline void CppUnorderedMapOfMap::commit(uint32_t t, const Row &r) {
 inline uint32_t CppUnorderedMapOfMap::commit(size_t n, const Row *rs) {
   auto t = ++clock;
   for (size_t i = 0; i < n; ++i)
-    commit (clock, rs[i]);
+    commit(clock, rs[i]);
   return clock;
 }
 
@@ -60,10 +60,23 @@ uint32_t CppUnorderedMapOfMap::write(uint32_t t, size_t n, const Row *rs) {
   return commit(n, rs);
 }
 
-vector<Cell> CppUnorderedMapOfMap::scan() const {
+vector<Cell> CppUnorderedMapOfMap::_scan(uint32_t t) const {
   vector<Cell> cs;
-  for (auto kvs: table)
-    for (auto v: kvs.second)
-      cs.push_back(Cell (kvs.first, v.second, UINT32_MAX - v.first));
+  for (auto kvs: table) {
+    for (auto v: kvs.second) {
+      auto t2 = UINT32_MAX - v.first;
+      if (t2 <= t)
+        cs.push_back(Cell(kvs.first, v.second, t2));
+    }
+  }
   return cs;
+}
+
+vector<Cell> CppUnorderedMapOfMap::scan(uint32_t t) const {
+  raise(t);
+  return _scan(t);
+}
+
+vector<Cell> CppUnorderedMapOfMap::scan() const {
+  return _scan(clock);
 }
