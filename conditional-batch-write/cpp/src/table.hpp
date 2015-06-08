@@ -144,4 +144,70 @@ class MutexShard: public Shard {
     mutable std::mutex lock;
 };
 
+// L is a LockSpace. S is a Shard.
+template <typename L, typename S>
+class ShardedTable: public Table {
+
+  public:
+
+    ShardedTable(size_t nlocks, size_t nshards):
+      size(nshards),
+      mask(nshards-1),
+      shards(nshards),
+      lock(nlocks)
+    {}
+
+    uint32_t time() const {
+      return lock.time();
+    }
+
+    void read(uint32_t t, size_t n, const int *ks, Value *vs) const {
+      lock.read(t, n, ks);
+      for (size_t i = 0; i < n; ++i) {
+        auto k = ks[i];
+        vs[i] = shards[k & mask].read(t, k);
+      }
+    }
+
+    uint32_t write(uint32_t t, size_t n, const Row *rs) {
+      auto wt = lock.write(t, n, rs)  + 1;
+      auto max = 0;
+      for (size_t i = 0; i < n; ++i) {
+        auto k = rs[i].k;
+        auto t2 = shards[k & mask].prepare(rs[i]);
+        if (max < t2)
+          max = t2;
+      }
+      if (t < max) {
+        lock.release(wt, n, rs);
+        throw stale_exception(t, max);
+      }
+      for (size_t i = 0; i < n; ++i) {
+        auto k = rs[i].k;
+        shards[k & mask].commit(wt, rs[i]);
+      }
+      lock.release(wt, n, rs);
+      return wt;
+    }
+
+    std::vector<Cell> scan() const {
+      auto now = time();
+      lock.scan(now);
+      std::vector<Cell> cs;
+      auto it = back_inserter(cs);
+      for (size_t i = 0; i < size; ++i) {
+        auto cs2 = shards[i].scan(now);
+        std::copy(cs2.begin(), cs2.end(), it);
+      }
+      return cs;
+    }
+
+  private:
+
+    const size_t size;
+    const size_t mask;
+    std::vector<S> shards;
+    mutable L lock;
+};
+
 #endif // TABLE_HPP

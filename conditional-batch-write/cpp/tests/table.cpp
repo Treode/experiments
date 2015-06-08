@@ -38,7 +38,7 @@ void expectMoneyConserved(const Table &table) {
   }
 }
 
-void table_behaviors(const function<Table*(void)> &new_table) {
+void table_behaviors(const function<Table*(void)> &new_table, bool parallel) {
 
   size_t nbrokers = 8;
   size_t ntransfers = 1000;
@@ -73,10 +73,32 @@ void table_behaviors(const function<Table*(void)> &new_table) {
     broker(*table, ntransfers);
     expectMoneyConserved(*table);
   }
+
+  if (parallel) {
+    SECTION("A table should preserve the money supply running in parallel", "[table]") {
+      unique_ptr<Table> table_ptr (new_table());
+      auto &table = *table_ptr;
+      vector<thread> brokers;
+      for (int i = 0; i < nbrokers; ++i) {
+        brokers.push_back(thread([&table, ntransfers] {
+          broker(table, ntransfers);
+        }));
+      }
+      for (auto &b: brokers)
+        b.join();
+      expectMoneyConserved(table);
+    }
+  }
 }
 
 TEST_CASE ("The CppUnorderedMapOfMap should work", "[tables]") {
   table_behaviors([] {
     return new CppUnorderedMapOfMap();
-  });
+  }, false);
+}
+
+TEST_CASE ("The ShardedTable should work", "[tables]") {
+  table_behaviors([] {
+    return new ShardedTable<LockSpace<ConditionLock>, MutexShard<CppUnorderedMapOfMap>>(128, 16);
+  }, true);
 }
