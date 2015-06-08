@@ -21,7 +21,7 @@ java -jar target/scala-2.11/cbw.jar
 
 ### Running the C++ Tests
 
-You’ll need `make` and `g++`.
+You’ll need `make` and `g++`. You’ll also need to install [thread building blocks][tbb]&mdash;be sure to [setup your environment][tbb-env].
 
 ```sh
 git clone git@github.com:Treode/experiments.git
@@ -56,5 +56,9 @@ Feel free to use GitHub issues to ask questions or suggest improvements. Also, f
 [rust-nightly]: http://doc.rust-lang.org/book/nightly-rust.html "Nightly Rust"
 
 [scala-lang]: http://scala-lang.org/ "The Scala Programming Language"
+
+[tbb]: https://www.threadingbuildingblocks.org/ "Intel® Threading Building Blocks"
+
+[tbb-env]: https://software.intel.com/en-us/blogs/2007/09/09/globalized-tbb-environment-configuration-on-linux/ "Globalized TBB Environment Configuration on Linux"
 
 [sbt]: http://www.scala-sbt.org/ "SBT"

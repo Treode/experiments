@@ -186,11 +186,18 @@ int main() {
     return new CppUnorderedMapOfMap();
   }, "CppUnorderedMapOfMap", platform, 1, 1, false, results);
 
-  for (auto nshards: shards)
-    for (auto nbrokers: brokers)
+  for (auto nshards: shards) {
+    for (auto nbrokers: brokers) {
+
       perf([=] {
-        return new ShardedTable<LockSpace<ConditionLock>, MutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "CppMutexShardedTable", platform, nshards, nbrokers, true, results);
+        return new ShardedTable<LockSpace<ConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+      }, "CppStdMutexShardedTable", platform, nshards, nbrokers, true, results);
+
+      perf([=] {
+        return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+      }, "CppTbbMutexShardedTable", platform, nshards, nbrokers, true, results);
+    }
+  }
 
   for (auto &r: results)
     cout << r << endl;

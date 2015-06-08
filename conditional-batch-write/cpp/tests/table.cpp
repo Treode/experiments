@@ -113,8 +113,15 @@ TEST_CASE ("The CppUnorderedMapOfMap should work", "[tables]") {
   }, false);
 }
 
-TEST_CASE ("The ShardedTable should work", "[tables]") {
+TEST_CASE ("The ShardedTable with std::mutex should work", "[tables]") {
   table_behaviors([] {
-    return new ShardedTable<LockSpace<ConditionLock>, MutexShard<CppUnorderedMapOfMap>>(128, 16);
+    return new ShardedTable<LockSpace<ConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(128, 16);
   }, true);
 }
+
+TEST_CASE ("The ShardedTable with TBB's mutex should work", "[tables]") {
+  table_behaviors([] {
+    return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(128, 16);
+  }, true);
+}
+

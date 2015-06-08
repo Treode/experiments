@@ -23,6 +23,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include "tbb/spin_mutex.h"
+
 struct Value {
 
   int v;
@@ -131,7 +133,7 @@ class Shard {
 
 // S is a shard
 template <typename S>
-class MutexShard: public Shard {
+class StdMutexShard: public Shard {
 
   public:
 
@@ -158,6 +160,37 @@ class MutexShard: public Shard {
   private:
     S shard;
     mutable std::mutex lock;
+};
+
+// S is a shard
+template <typename S>
+class TbbMutexShard: public Shard {
+
+  public:
+
+    Value read(uint32_t t, int k) const {
+      tbb::spin_mutex::scoped_lock acqn(lock);
+      return shard.read(t, k);
+    }
+
+    uint32_t prepare(const Row &r) const {
+      tbb::spin_mutex::scoped_lock acqn(lock);
+      return shard.prepare(r);
+    }
+
+    void commit(uint32_t t, const Row &r) {
+      tbb::spin_mutex::scoped_lock acqn(lock);
+      shard.commit(t, r);
+    }
+
+    std::vector<Cell> scan(uint32_t t) const {
+      tbb::spin_mutex::scoped_lock acqn(lock);
+      return shard.scan(t);
+    }
+
+  private:
+    S shard;
+    mutable tbb::spin_mutex lock;
 };
 
 // L is a LockSpace. S is a Shard.
