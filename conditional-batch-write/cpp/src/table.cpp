@@ -57,11 +57,19 @@ ostream &operator<<(ostream &os, const Table &table) {
   return os;
 }
 
-void broker(Table &table, unsigned ntransfers) {
+// Simulate doing other work.
+unsigned fib(unsigned n) {
+  if (n < 2)
+    return 1;
+  return fib(n-1) + fib(n-2);
+}
+
+unsigned broker(Table &table, unsigned ntransfers) {
 
   std::default_random_engine reng;
   std::uniform_int_distribution<int> racct(0, 100);
   std::uniform_int_distribution<int> ramt(0, 1000);
+  unsigned sum = 0;
 
   for (unsigned i = 0; i < ntransfers; ++i) {
     int a1 = racct(reng);
@@ -69,15 +77,22 @@ void broker(Table &table, unsigned ntransfers) {
     while ((a2 = racct (reng)) == a1);
     auto n = ramt(reng);
 
+    //sum += fib(10); // read request from network
     auto rt = table.time();
     int ks[] = {a1, a2};
     Value vs[2];
     table.read(rt, 2, ks, vs);
+
+    //sum += fib(10); // processing
     try {
       Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
       table.write(rt, 2, rs);
     } catch (stale_exception e) {
       // ignored
     }
+
+    //sum += fib(10); // write response to network
   }
+
+  return sum;
 }

@@ -114,7 +114,7 @@ class Table {
 
 std::ostream &operator<<(std::ostream &os, const Table &table);
 
-void broker(Table &table, unsigned ntransfers);
+unsigned broker(Table &table, unsigned ntransfers);
 
 class Shard {
 
