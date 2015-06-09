@@ -19,6 +19,7 @@
 #include <thread>
 
 #include "ConditionLock.hpp"
+#include "TbbConditionLock.hpp"
 #include "catch.hpp"
 
 using std::chrono::milliseconds;
@@ -81,82 +82,91 @@ void repeat(const function<void()> &body) {
     body();
 }
 
-TEST_CASE("A lock should block a later writer", "[lock]") {
-  repeat ([]{
-    ConditionLock lock;
-    lock.write(1);
-    spawn t([&lock] {
-      return lock.write(2);
+void lock_behaviors(const function<Lock*(void)> &new_lock) {
+
+  SECTION("A lock should block a later writer", "[lock]") {
+    repeat ([]{
+      ConditionLock lock;
+      lock.write(1);
+      spawn t([&lock] {
+        return lock.write(2);
+      });
+      t.assert_alive();
+      lock.release(2);
+      t.assert_exited(2);
     });
-    t.assert_alive();
-    lock.release(2);
-    t.assert_exited(2);
-  });
+  }
+
+  SECTION("A lock should block a later writer and raise the time", "[lock]") {
+    repeat ([] {
+      ConditionLock lock;
+      lock.write(1);
+      spawn t([&lock] {
+        return lock.write(2);
+      });
+      t.assert_alive();
+      lock.release(3);
+      t.assert_exited(3);
+    });
+  }
+
+  SECTION("A lock should block an earlier writer and raise the time", "[lock]") {
+    repeat ([] {
+      ConditionLock lock;
+      lock.write(2);
+      spawn t([&lock] {
+        return lock.write(1);
+      });
+      t.assert_alive();
+      lock.release(3);
+      t.assert_exited(3);
+    });
+  }
+
+  SECTION("A lock should block a later reader", "[lock]") {
+    repeat ([] {
+      ConditionLock lock;
+      lock.write(1);
+      spawn t([&lock] {
+        lock.read(2);
+        return 0;
+      });
+      t.assert_alive();
+      lock.release(2);
+      t.assert_exited(0);
+    });
+  }
+
+  SECTION("A lock should block a later reader and raise the time", "[lock]") {
+    repeat ([] {
+      ConditionLock lock;
+      lock.write(1);
+      spawn t([&lock] {
+        lock.read(3);
+        return 0;
+      });
+      t.assert_alive();
+      lock.release(2);
+      t.assert_exited(0);
+      REQUIRE(lock.write(2) == 3);
+    });
+  }
+
+  SECTION("A lock should an earlier reader", "[lock]") {
+    repeat ([] {
+      ConditionLock lock;
+      lock.write(1);
+      spawn t([&lock] {
+        lock.read(1);
+        return 0;
+      });
+      t.assert_exited(0);
+    });
+  }
 }
 
-TEST_CASE("A lock should block a later writer and raise the time", "[lock]") {
-  repeat ([] {
-    ConditionLock lock;
-    lock.write(1);
-    spawn t([&lock] {
-      return lock.write(2);
-    });
-    t.assert_alive();
-    lock.release(3);
-    t.assert_exited(3);
-  });
-}
-
-TEST_CASE("A lock should block an earlier writer and raise the time", "[lock]") {
-  repeat ([] {
-    ConditionLock lock;
-    lock.write(2);
-    spawn t([&lock] {
-      return lock.write(1);
-    });
-    t.assert_alive();
-    lock.release(3);
-    t.assert_exited(3);
-  });
-}
-
-TEST_CASE("A lock should block a later reader", "[lock]") {
-  repeat ([] {
-    ConditionLock lock;
-    lock.write(1);
-    spawn t([&lock] {
-      lock.read(2);
-      return 0;
-    });
-    t.assert_alive();
-    lock.release(2);
-    t.assert_exited(0);
-  });
-}
-
-TEST_CASE("A lock should block a later reader and raise the time", "[lock]") {
-  repeat ([] {
-    ConditionLock lock;
-    lock.write(1);
-    spawn t([&lock] {
-      lock.read(3);
-      return 0;
-    });
-    t.assert_alive();
-    lock.release(2);
-    t.assert_exited(0);
-    REQUIRE(lock.write(2) == 3);
-  });
-}
-
-TEST_CASE("A lock should an earlier reader", "[lock]") {
-  repeat ([] {
-    ConditionLock lock;
-    lock.write(1);
-    spawn t([&lock] {
-      lock.read(1);
-      return 0;
-    });
-    t.assert_exited(0);
+TEST_CASE ("The ConditionLock should work", "[locks]") {
+  lock_behaviors([] {
+    return new ConditionLock();
   });
 }
