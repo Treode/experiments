@@ -89,5 +89,5 @@ trait NewScalaSortedMap extends NewTable {
 
   def parallel = false
 
-  def newTable = new ScalaSortedMap
+  def newTable (implicit params: Params) = new ScalaSortedMap
 }

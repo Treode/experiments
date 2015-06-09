@@ -19,6 +19,17 @@ import java.util.concurrent.{ExecutionException, Future}
 
 package object experiments {
 
+  case class Params (platform: String, nlocks: Int, nshards: Int, naccounts: Int, nbrokers: Int, ntransfers: Int) {
+
+    override def toString =
+      s"platform: $platform, " +
+      s"nlocks: $nlocks, " +
+      s"nshards: $nshards, " +
+      s"naccounts: $naccounts, " +
+      s"nbrokers: $nbrokers, " +
+      s"ntransfers: $ntransfers"
+  }
+
   implicit class RichFuture [A] (f: Future [A]) {
 
     def safeGet: A =

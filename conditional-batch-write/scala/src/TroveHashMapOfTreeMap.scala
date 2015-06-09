@@ -25,9 +25,9 @@ import scala.collection.JavaConversions._
   * `t' = Int.MaxValue - x`, so searching for the ceiling of `Int.MaxValue` will find the the most
   * recent value for the key. This is not thread safe.
   */
-class TroveHashMapOfTreeMap (hint: Int) extends Table {
+class TroveHashMapOfTreeMap (implicit params: Params) extends Table {
 
-  private val table = new TIntObjectHashMap [TreeMap [Int, Int]] (hint)
+  private val table = new TIntObjectHashMap [TreeMap [Int, Int]] (params.naccounts)
 
   private var clock = 0
 
@@ -116,5 +116,5 @@ trait NewTroveHashMapOfTreeMap extends NewTable {
 
   def parallel = false
 
-  def newTable = new TroveHashMapOfTreeMap (naccounts)
+  def newTable (implicit params: Params) = new TroveHashMapOfTreeMap
 }

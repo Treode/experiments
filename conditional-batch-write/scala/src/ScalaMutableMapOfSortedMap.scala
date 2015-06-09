@@ -22,12 +22,12 @@ import scala.collection.{SortedMap, mutable}
   * `t' = Int.MaxValue - x`, so searching for the ceiling of `Int.MaxValue` will find the the most
   * recent value for the key. This is not thread safe.
   */
-class ScalaMutableMapOfSortedMap (hint: Int) extends Table {
+class ScalaMutableMapOfSortedMap (implicit params: Params) extends Table {
 
   private val table =
     new mutable.HashMap [Int, SortedMap [Int, Int]]
       .withDefaultValue (SortedMap (Int.MaxValue -> 0))
-  table.sizeHint (hint)
+  table.sizeHint (params.naccounts)
 
   private var clock = 0
 
@@ -89,6 +89,6 @@ trait NewScalaMutableMapOfSortedMap extends NewTable {
 
   def parallel = false
 
-  def newTable = new ScalaMutableMapOfSortedMap (naccounts)
+  def newTable (implicit params: Params) = new ScalaMutableMapOfSortedMap
 }
 

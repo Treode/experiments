@@ -93,6 +93,6 @@ object ConditionLock {
 
   case class Waiter (thread: Thread, time: Int, now: Int)
 
-  def space (nlocks: Int): LockSpace =
-    LockSpace (nlocks) (new ConditionLock)
+  def newSpace (implicit params: Params): LockSpace =
+    LockSpace (params.nlocks) (new ConditionLock)
 }

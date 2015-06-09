@@ -92,5 +92,5 @@ trait NewJavaConcurrentSkipListMap extends NewTable {
 
   def parallel = true
 
-  def newTable = new JavaConcurrentSkipListMap (AqsLock.space (nlocks))
+  def newTable (implicit params: Params) = new JavaConcurrentSkipListMap (AqsLock.newSpace)
 }

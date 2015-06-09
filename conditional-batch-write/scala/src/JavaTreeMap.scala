@@ -90,5 +90,5 @@ trait NewJavaTreeMap extends NewTable {
 
   def parallel = false
 
-  def newTable = new JavaTreeMap
+  def newTable (implicit params: Params) = new JavaTreeMap
 }

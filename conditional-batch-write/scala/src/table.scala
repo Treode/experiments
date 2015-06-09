@@ -92,21 +92,17 @@ trait Table {
 /** Factory to make tables. */
 trait NewTable {
 
-  val nlocks: Int
-  val nshards: Int
-  val naccounts: Int
-
   /** Is this implementation safe to use from multiple threads? */
   def parallel: Boolean
 
   /** Make a table. */
-  def newTable: Table
+  def newTable (implicit params: Params): Table
 
-  def newRecommendedTable: Table =
-    new JavaHashMapOfTreeMap (naccounts)
+  def newRecommendedTable (implicit params: Params): Table =
+    new JavaHashMapOfTreeMap
 
-  def newRecommendedShard: Shard =
-    new JavaHashMapOfTreeMap (naccounts)
+  def newRecommendedShard (implicit params: Params): Shard =
+    new JavaHashMapOfTreeMap
 
   def newRecommendedScheduler: SingleThreadScheduler =
     SingleThreadScheduler.newUsingExecutor
@@ -135,7 +131,8 @@ trait NewSynchronizedTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new SynchronizedTable (newRecommendedTable)
+  def newTable (implicit params: Params) =
+    new SynchronizedTable (newRecommendedTable)
 }
 
 /** Wrap a table with a `SingleThreadScheduler` to make it thread safe. */
@@ -161,58 +158,59 @@ trait NewSingleThreadExecutorTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new SingleThreadTable (
-    newRecommendedTable,
-    SingleThreadScheduler.newUsingExecutor)
+  def newTable (implicit params: Params) =
+    new SingleThreadTable (
+      newRecommendedTable,
+      SingleThreadScheduler.newUsingExecutor)
 }
 
 trait NewSimpleQueueTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new SingleThreadTable (
-    newRecommendedTable,
-    SingleThreadScheduler.newUsingSimpleQueue)
+  def newTable (implicit params: Params) =
+    new SingleThreadTable (
+      newRecommendedTable,
+      SingleThreadScheduler.newUsingSimpleQueue)
 }
 
 trait NewShardedQueueTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new SingleThreadTable (
-    newRecommendedTable,
-    SingleThreadScheduler.newUsingShardedQueue (nshards))
+  def newTable (implicit params: Params) =
+    new SingleThreadTable (
+      newRecommendedTable,
+      SingleThreadScheduler.newUsingShardedQueue (params.nshards))
 }
 
 trait NewJCToolsQueueTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new SingleThreadTable (
-    newRecommendedTable,
-    SingleThreadScheduler.newUsingJCToolsQueue)
+  def newTable (implicit params: Params) =
+    new SingleThreadTable (
+      newRecommendedTable,
+      SingleThreadScheduler.newUsingJCToolsQueue)
 }
 
 /** Methods to support functional and performance testing of the implementations. */
 trait TableTools {
   this: NewTable =>
 
-  val nbrokers: Int
-  val ntransfers: Int
-
   /** Make a table, perform a method on it, close the table. */
-  def withTable [A] (f: Table => A): A = {
+  def withTable [A] (f: Table => A) (implicit params: Params): A = {
     val table = newTable
     try (f (table)) finally (table.close())
   }
 
   /** Transfer money from one account to another `ntransfers` times in this thread. */
-  def broker (table: Table) {
-
+  def broker (table: Table) (implicit params: Params) {
+    import params.{naccounts, nbrokers, ntransfers}
     val random = new Random
     var nstale = 0
 
-    def transfer() {
+    def transfer () {
       // Two accounts and an amount to transfer from a1 to a2
       val a1 = random.nextInt (naccounts)
       var a2 = random.nextInt (naccounts)
@@ -228,13 +226,14 @@ trait TableTools {
         case t: StaleException => nstale += 1
       }}
 
-    for (_ <- 0 until ntransfers)
+    val count = ntransfers / nbrokers
+    for (_ <- 0 until count)
       transfer()
-    assert (nstale < ntransfers)
+    assert (nstale < count)
   }
 
   /** Transfer money from one account to another `ntransfers` times in a new thread. */
-  class Broker (table: Table) extends Thread {
+  class Broker (table: Table) (implicit params: Params) extends Thread {
     override def run() = broker (table)
   }
 
@@ -243,7 +242,8 @@ trait TableTools {
     * @param parallel Run each broker in its own thread? If not, then run them serially in this
     * thread.
     */
-  def transfers (table: Table, parallel: Boolean): Long = {
+  def transfers (table: Table, parallel: Boolean) (implicit params: Params): Long = {
+    import params.nbrokers
     if (parallel) {
       val ts = for (_ <- 0 until nbrokers) yield new Broker (table)
       val start = System.nanoTime
@@ -259,6 +259,6 @@ trait TableTools {
       end - start
     }}
 
-  def transfers (parallel: Boolean): Long =
+  def transfers (parallel: Boolean) (implicit params: Params): Long =
     withTable (transfers (_, parallel))
 }

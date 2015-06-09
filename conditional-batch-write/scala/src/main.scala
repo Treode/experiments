@@ -20,11 +20,6 @@ import java.lang.Integer.{bitCount, highestOneBit}
 import java.lang.Runtime.getRuntime
 import scala.collection.mutable.Builder
 
-case class PerfParams (platform: String, nshards: Int, nbrokers: Int) {
-
-  override def toString = s"platform: $platform, nshards: $nshards, nbrokers: $nbrokers"
-}
-
 case class PerfResult (name: String, platform: String, nshards: Int, nbrokers: Int, result: Double) {
 
   override def toString = f"$name, java, $platform, $nshards, $nbrokers, $result"
@@ -32,7 +27,7 @@ case class PerfResult (name: String, platform: String, nshards: Int, nbrokers: I
 
 object PerfResult {
 
-  def apply (name: String, p: PerfParams, result: Double): PerfResult =
+  def apply (name: String, result: Double) (implicit p: Params): PerfResult =
     new PerfResult (name, p.platform, p.nshards, p.nbrokers, result)
 }
 
@@ -48,38 +43,33 @@ class PerfResults {
 }
 
 /** Repeat transfers experiments until
-  * - `count` execute within `tolerance` of the running mean time,
+  * - `nhits` execute within `tolerance` of the running mean time,
   * - `ntrials` execute,
   * - `nseconds` pass,
   * whichever comes first.
   *
   * Report measurements that are within `tolerance` of the running mean time.
   */
-class TablePerf (implicit p: PerfParams) extends TableTools {
+class TablePerf extends TableTools {
   this: NewTable =>
-
-  val nlocks = 1024
-  val nshards = p.nshards
-  val naccounts = 100
-
-  val nbrokers = p.nbrokers
-  val ntransfers = 1000
 
   val ntrials = 2000
   val nseconds = 60
-  val count = 20
+  val nhits = 20
   val tolerance = 0.05
-  val ops = (nbrokers * ntransfers).toDouble
   val million = (1000 * 1000).toDouble
 
-  def perf(): PerfResult = {
+  def perf () (implicit params: Params): PerfResult = {
+
+    import params.{nbrokers, ntransfers}
 
     val name = getClass.getSimpleName
-    println (s"$name, $p")
+    println (s"$name, $params")
 
+    val ops = ntransfers.toDouble
     val limit  = System.currentTimeMillis + nseconds * 1000
     var sum = 0.toDouble
-    var hits = count
+    var hits = nhits
 
     for (trial <- 0 until ntrials) {
       val ns = withTable (transfers (_, parallel)) .toDouble
@@ -92,13 +82,13 @@ class TablePerf (implicit p: PerfParams) extends TableTools {
         println (f"$trial%5d: $x%8.2f ops/ms ($mean%8.2f)")
         hits -= 1
         if (hits == 0)
-          return PerfResult (name, p, mean)
+          return PerfResult (name, mean)
       }
       if (System.currentTimeMillis > limit)
-        return PerfResult (name, p, mean)
+        return PerfResult (name, mean)
     }
     val mean = sum / ntrials.toDouble
-    PerfResult (name, p, mean)
+    PerfResult (name, mean)
   }}
 
 //
@@ -107,22 +97,22 @@ class TablePerf (implicit p: PerfParams) extends TableTools {
 // Cannot handle concurrent clients.
 //
 
-class JavaHashMapOfTreeMapPerf (implicit p: PerfParams)
+class JavaHashMapOfTreeMapPerf (implicit p: Params)
   extends TablePerf with NewJavaHashMapOfTreeMap
 
-class JavaTreeMapPerf (implicit p: PerfParams)
+class JavaTreeMapPerf (implicit p: Params)
   extends TablePerf with NewJavaTreeMap
 
-class ScalaMapOfSortedMapPerf (implicit p: PerfParams)
+class ScalaMapOfSortedMapPerf (implicit p: Params)
   extends TablePerf with NewScalaMapOfSortedMap
 
-class ScalaMutableMapOfSortedMapPerf (implicit p: PerfParams)
+class ScalaMutableMapOfSortedMapPerf (implicit p: Params)
   extends TablePerf with NewScalaMutableMapOfSortedMap
 
-class ScalaSortedMapPerf (implicit p: PerfParams)
+class ScalaSortedMapPerf (implicit p: Params)
   extends TablePerf with NewScalaSortedMap
 
-class TroveHashMapOfTreeMapPerf (implicit p: PerfParams)
+class TroveHashMapOfTreeMapPerf (implicit p: Params)
   extends TablePerf with NewTroveHashMapOfTreeMap
 
 //
@@ -132,16 +122,16 @@ class TroveHashMapOfTreeMapPerf (implicit p: PerfParams)
 // Queue tasks onto a single thread.
 //
 
-class SingleThreadExecutorPerf (implicit p: PerfParams)
+class SingleThreadExecutorPerf (implicit p: Params)
   extends TablePerf with NewSingleThreadExecutorTable
 
-class SimpleQueuePerf (implicit p: PerfParams)
+class SimpleQueuePerf (implicit p: Params)
   extends TablePerf with NewSimpleQueueTable
 
-class ShardedQueuePerf (implicit p: PerfParams)
+class ShardedQueuePerf (implicit p: Params)
   extends TablePerf with NewShardedQueueTable
 
-class JCToolsQueuePerf (implicit p: PerfParams)
+class JCToolsQueuePerf (implicit p: Params)
   extends TablePerf with NewJCToolsQueueTable
 
 //
@@ -150,35 +140,35 @@ class JCToolsQueuePerf (implicit p: PerfParams)
 // Handle concurrency some other way.
 //
 
-class JavaConcurrentSkipListMapPerf (implicit p: PerfParams)
+class JavaConcurrentSkipListMapPerf (implicit p: Params)
   extends TablePerf with NewJavaConcurrentSkipListMap
 
-class SynchronizedTablePerf (implicit p: PerfParams)
+class SynchronizedTablePerf (implicit p: Params)
   extends TablePerf  with NewSynchronizedTable
 
-class SynchronizedShardedTablePerf (implicit p: PerfParams)
+class SynchronizedShardedTablePerf (implicit p: Params)
   extends TablePerf with NewSynchronizedShardedTable
 
-class ReadWriteShardedTablePerf (implicit p: PerfParams)
+class ReadWriteShardedTablePerf (implicit p: Params)
   extends TablePerf with NewReadWriteShardedTable
 
-class SingleThreadShardedTablePerf (implicit p: PerfParams)
+class SingleThreadShardedTablePerf (implicit p: Params)
   extends TablePerf with NewSingleThreadShardedTable
 
-class FutureShardedTablePerf (implicit p: PerfParams)
+class FutureShardedTablePerf (implicit p: Params)
   extends TablePerf with NewFutureShardedTable
 
-class CollectorShardedTablePerf (implicit p: PerfParams)
+class CollectorShardedTablePerf (implicit p: Params)
   extends TablePerf with NewCollectorShardedTable
 
-class DisruptorTablePerf (implicit p: PerfParams)
+class DisruptorTablePerf (implicit p: Params)
   extends TablePerf with NewDisruptorTable
 
 //
 // Alternative Logical-Lock strategies, using SynchronizedShardedTable
 //
 
-class ConditionLockPerf (implicit p: PerfParams)
+class ConditionLockPerf (implicit p: Params)
   extends TablePerf with NewConditionLockTable
 
 object Main {
@@ -187,10 +177,10 @@ object Main {
   val shards =
     Seq.tabulate (bitCount (highestOneBit (getRuntime.availableProcessors) - 1) + 1) (1 << _)
 
-  val brokers = Seq (2, 4, 8, 16, 32, 64)
+  val brokers = Seq (1, 2, 4, 8, 16, 32, 64)
 
   // Cannot handle concurrent clients.
-  def unthreaded (results: PerfResults) (implicit params: PerfParams) {
+  def unthreaded (results: PerfResults) (implicit params: Params) {
     results += (new JavaHashMapOfTreeMapPerf).perf()
     results += (new JavaTreeMapPerf).perf()
     results += (new ScalaMapOfSortedMapPerf).perf()
@@ -200,7 +190,7 @@ object Main {
   }
 
   // Queue tasks onto a single thread.
-  def queues (results: PerfResults) (implicit params: PerfParams) {
+  def queues (results: PerfResults) (implicit params: Params) {
     results += (new SingleThreadExecutorPerf).perf()
     results += (new SimpleQueuePerf).perf()
     results += (new ShardedQueuePerf).perf()
@@ -208,7 +198,7 @@ object Main {
   }
 
   // Handle concurrency some other way.
-  def concurrent (results: PerfResults) (implicit params: PerfParams) {
+  def concurrent (results: PerfResults) (implicit params: Params) {
     results += (new SynchronizedTablePerf).perf()
     results += (new JavaConcurrentSkipListMapPerf).perf()
     results += (new SynchronizedShardedTablePerf).perf()
@@ -220,29 +210,34 @@ object Main {
   }
 
   // Alternative locking strategies.
-  def locks (results: PerfResults) (implicit params: PerfParams) {
+  def locks (results: PerfResults) (implicit params: Params) {
     results += (new ConditionLockPerf).perf()
   }
 
   def main (args: Array [String]) {
 
-    val platform =
-      if (args.length > 0) args (0) else "unknown"
+    val params = Params (
+      platform = if (args.length > 0) args (0) else "unknown",
+      nlocks = 128,
+      nshards = 1,
+      naccounts = 100,
+      nbrokers = 1,
+      ntransfers = 6400)
 
     val results = new PerfResults
 
-    unthreaded (results) (PerfParams (platform, 1, 1))
+    unthreaded (results) (params)
 
     for (nbrokers <- brokers)
-      queues (results) (PerfParams (platform, 1, nbrokers))
+      queues (results) (params.copy (nbrokers = nbrokers))
 
     for (nshards <- shards)
       for (nbrokers <- brokers)
-        concurrent (results) (PerfParams (platform, nshards, nbrokers))
+        concurrent (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
 
     for (nshards <- shards)
       for (nbrokers <- brokers)
-        locks (results) (PerfParams (platform, nshards, nbrokers))
+        locks (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
 
     println ("--")
     println (results)

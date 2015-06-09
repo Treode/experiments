@@ -18,7 +18,7 @@ package experiments
 
 import java.util.concurrent.locks.AbstractQueuedSynchronizer
 
-/** A Lock that uses Java's AbstractQueuedSynchronizer. 
+/** A Lock that uses Java's AbstractQueuedSynchronizer.
   *
   * C++ does not have anything similar to AbstractQueuedSynchronizer.
   */
@@ -122,6 +122,6 @@ object AqsLock {
       true
   }
 
-  def space (nlocks: Int): LockSpace =
-    LockSpace (nlocks) (new AqsLock)
+  def newSpace (implicit params: Params): LockSpace =
+    LockSpace (params.nlocks) (new AqsLock)
 }

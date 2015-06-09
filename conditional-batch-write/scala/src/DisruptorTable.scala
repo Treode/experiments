@@ -226,7 +226,9 @@ object EventAwait extends EventHandler [TableEvent] {
       }
     }}}
 
-class DisruptorTable (lock: LockSpace, nshards: Int) extends Table {
+class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
+
+  import params.nshards
 
   require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
 
@@ -310,5 +312,5 @@ trait NewDisruptorTable extends NewTable {
 
   def parallel = true
 
-  def newTable = new DisruptorTable (AqsLock.space (nlocks), nshards)
+  def newTable (implicit params: Params) = new DisruptorTable (AqsLock.newSpace)
 }
