@@ -23,6 +23,7 @@
 
 #include "ConditionLock.hpp"
 #include "CppUnorderedMapOfMap.hpp"
+#include "TbbConditionLock.hpp"
 #include "lock.hpp"
 #include "table.hpp"
 
@@ -191,11 +192,19 @@ int main() {
 
       perf([=] {
         return new ShardedTable<LockSpace<ConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "CppStdMutexShardedTable", platform, nshards, nbrokers, true, results);
+      }, "StdLockAndTable", platform, nshards, nbrokers, true, results);
 
       perf([=] {
         return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "CppTbbMutexShardedTable", platform, nshards, nbrokers, true, results);
+      }, "StdLockTbbTable", platform, nshards, nbrokers, true, results);
+
+      perf([=] {
+        return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+      }, "TbbLockStdTable", platform, nshards, nbrokers, true, results);
+
+      perf([=] {
+        return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+      }, "TbbLockAndTable", platform, nshards, nbrokers, true, results);
     }
   }
 

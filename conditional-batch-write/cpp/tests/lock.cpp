@@ -170,3 +170,9 @@ TEST_CASE ("The ConditionLock should work", "[locks]") {
     return new ConditionLock();
   });
 }
+
+TEST_CASE ("The TbbConditionLock should work", "[locks]") {
+  lock_behaviors([] {
+    return new TbbConditionLock();
+  });
+}
