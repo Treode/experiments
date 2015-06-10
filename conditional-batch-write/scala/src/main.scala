@@ -50,14 +50,15 @@ class PerfResults {
   *
   * Report measurements that are within `tolerance` of the running mean time.
   */
-class SyncTablePerf extends TableTools {
-  this: NewTable =>
+trait TablePerf {
 
   val ntrials = 2000
   val nseconds = 60
   val nhits = 20
   val tolerance = 0.05
   val million = (1000 * 1000).toDouble
+
+  def trial () (implicit params: Params): Long
 
   def perf () (implicit params: Params): PerfResult = {
 
@@ -72,7 +73,7 @@ class SyncTablePerf extends TableTools {
     var hits = nhits
 
     for (trial <- 0 until ntrials) {
-      val ns = withTable (transfers (_, parallel)) .toDouble
+      val ns = this.trial().toDouble
       val x = ops / ns * million
       sum += x
       val n = (trial + 1).toDouble
@@ -90,6 +91,21 @@ class SyncTablePerf extends TableTools {
     val mean = sum / ntrials.toDouble
     PerfResult (name, mean)
   }}
+
+class SyncTablePerf extends TablePerf with TableTools {
+  this: NewTable =>
+
+  def trial () (implicit params: Params): Long =
+    withTable (transfers (_, parallel))
+}
+
+class AsyncTablePerf extends TablePerf with AsyncTableTools {
+  this: NewAsyncTable =>
+
+  def trial () (implicit params: Params): Long =
+    withTable  { table => implicit scheduler =>
+      transfers (table)
+    }}
 
 //
 // Single-Threaded Strategies
@@ -171,6 +187,22 @@ class DisruptorTablePerf (implicit p: Params)
 class ConditionLockPerf (implicit p: Params)
   extends SyncTablePerf with NewConditionLockTable
 
+//
+// Asynchronous strategies.
+//
+
+class FiberizedTablePerf (implicit p: Params)
+  extends AsyncTablePerf with NewFiberizedTable
+
+class FiberizedForkJoinTablePerf (implicit p: Params)
+  extends AsyncTablePerf with NewFiberizedForkJoinTable
+
+class FiberizedShardedTablePerf (implicit p: Params)
+  extends AsyncTablePerf with NewFiberizedShardedTable
+
+class FiberizedShardedForkJoinTablePerf (implicit p: Params)
+  extends AsyncTablePerf with NewFiberizedShardedForkJoinTable
+
 object Main {
 
   // Powers of 2, from 1 to availableProcessors (or next power of 2).
@@ -214,6 +246,17 @@ object Main {
     results += (new ConditionLockPerf).perf()
   }
 
+  // Asynchronous strategies.
+  def asynchronous (results: PerfResults) (implicit params: Params) {
+    results += (new FiberizedTablePerf).perf()
+    results += (new FiberizedForkJoinTablePerf).perf()
+  }
+
+  def asynchronousSharded (results: PerfResults) (implicit params: Params) {
+    results += (new FiberizedShardedTablePerf).perf()
+    results += (new FiberizedShardedForkJoinTablePerf).perf()
+  }
+
   def main (args: Array [String]) {
 
     val params = Params (
@@ -238,6 +281,13 @@ object Main {
     for (nshards <- shards)
       for (nbrokers <- brokers)
         locks (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
+
+    for (nbrokers <- brokers)
+      asynchronous (results) (params.copy (nbrokers = nbrokers))
+
+    for (nshards <- shards)
+      for (nbrokers <- brokers)
+        asynchronousSharded (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
 
     println ("--")
     println (results)

@@ -22,16 +22,62 @@ import java.util.concurrent._
 
 import org.jctools.queues.MpscCompoundQueue
 
-/** Schedule tasks in one thread. */
-trait SingleThreadScheduler {
+/** Schedule tasks and eventually execute them. */
+trait Scheduler {
+
+  /** Call from any thread to schedule a task. */
+  def execute (task: Runnable)
 
   /** Call from any thread to schedule a task. */
   def execute (task: => Any)
 
+  def shutdown()
+}
+
+object Scheduler {
+
+  private class UsingExecutor (executor: ExecutorService) extends Scheduler {
+
+    def execute (task: Runnable): Unit =
+      executor.execute (new Runnable {
+        def run(): Unit =
+          try {
+            task.run()
+          } catch {
+            case t: Throwable =>
+              println (s"uncaught $t")
+              executor.shutdown()
+          }})
+
+    def execute (task: => Any): Unit =
+      executor.execute (new Runnable {
+        def run(): Unit =
+          try {
+            task
+          } catch {
+            case t: Throwable =>
+              println (s"uncaught $t")
+              executor.shutdown()
+          }})
+
+    def shutdown(): Unit =
+      executor.shutdown()
+  }
+
+  /** Use Java's cached thread pool for our Scheduler. */
+  def newUsingCachedThreadPool: Scheduler =
+    new UsingExecutor (Executors.newCachedThreadPool)
+
+  /** Use Java's ForkJoinPool for our Scheduler. */
+  def newUsingForkJoinPool: Scheduler =
+    new UsingExecutor (new ForkJoinPool (64))
+}
+
+/** Schedule tasks and eventually execute them in one thread. */
+trait SingleThreadScheduler extends Scheduler {
+
   /** Call from any thread to schedule a task and await the result. */
   def submit [A] (task: => A): Future [A]
-
-  def shutdown()
 }
 
 /** A thread-safe queue. */
@@ -181,8 +227,11 @@ object SingleThreadScheduler {
 
     private val executor = Executors.newSingleThreadExecutor
 
+    def execute (task: Runnable): Unit =
+      executor.execute (task)
+
     def execute (task: => Any): Unit =
-      executor.submit (new Runnable {
+      executor.execute (new Runnable {
         def run(): Unit = task
       })
 
@@ -206,6 +255,9 @@ object SingleThreadScheduler {
           case t: InterruptedException => ()
         }}
     thread.start()
+
+    def execute (task: Runnable): Unit =
+      queue.enqueue (task)
 
     def execute (task: => Any): Unit =
       queue.enqueue (new Runnable {
@@ -236,4 +288,58 @@ object SingleThreadScheduler {
 
   def newUsingJCToolsQueue: SingleThreadScheduler =
     new UsingQueue (new JCToolsQueue (1024))
+}
+
+class Fiber (scheduler: Scheduler) extends Scheduler {
+
+  /** Treated as a constant. */
+  private [this] val empty = new ArrayDeque [Runnable]
+
+  private [this] var tasks = new ArrayDeque [Runnable]
+  private [this] var engaged = false
+
+  /** If engaged, enqueue the task and return false. Otherwise, return true to indicate caller
+    * can run the task immediately in this thread.
+    */
+  private [this] def enqueue (task: Runnable): Boolean =
+    synchronized {
+      if (!engaged) {
+        engaged = true
+        false
+      } else {
+        tasks.add (task)
+        true
+      }}
+
+  /** Return the current queue of tasks. */
+  private [this] def drain(): ArrayDeque [Runnable] =
+    synchronized {
+      if (tasks.isEmpty) {
+        engaged = false
+        empty
+      } else {
+        val t = tasks
+        tasks = new ArrayDeque
+        t
+      }}
+
+  private [this] def add (task: Runnable): Unit = {
+    if (!enqueue (task)) {
+      task.run()
+      var next = drain()
+      while (!next.isEmpty) {
+        while (!next.isEmpty)
+          next.remove().run()
+        next = drain()
+      }}}
+
+  def execute (task: Runnable): Unit =
+    add (task)
+
+  def execute (task: => Any): Unit =
+    add (new Runnable {
+      def run(): Unit = task
+    })
+
+  def shutdown() = ()
 }

@@ -1,5 +1,8 @@
 package experiments
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit.SECONDS
+
 import org.scalatest.FlatSpec
 
 /** Functional tests for the implementations. */
@@ -69,6 +72,45 @@ trait TableBehaviors extends FlatSpec with TableTools {
         assertMoneyConserved (table)
       }}}}
 
+trait AsyncTableBehaviors extends FlatSpec with AsyncTableTools {
+  this: NewAsyncTable =>
+
+  implicit val params = Params (
+    platform = "unknown",
+    nlocks = 8,
+    nshards = 8,
+    naccounts = 100,
+    nbrokers = 8,
+    ntransfers = 1000)
+
+  def assertSeq [A] (expected: A*) (actual: Seq [A]): Unit =
+    assertResult (expected) (actual)
+
+  /** The physics and chemstry notion of "conserved". */
+  def assertMoneyConserved (table: AsyncTable) {
+    val scanned = new CountDownLatch (1)
+    table.scan { cells =>
+      val history = cells.groupBy (_.t)
+        .toSeq
+        .sortBy (_._1)
+      var tracker = Map.empty [Int, Int]
+      for ((t, cs) <- history) {
+        for (c <- cs)
+          tracker += c.k -> c.v
+        val sum = tracker.values.sum
+        assert (sum == 0)
+      }
+      scanned.countDown()
+    }
+    assert (scanned.await (1, SECONDS))
+  }
+
+  it should "preserve the money supply" in {
+    withTable { table => implicit scheduler =>
+      transfers (table)
+      assertMoneyConserved (table)
+    }}}
+
 //
 // Single-Threaded Strategies
 //
@@ -122,3 +164,15 @@ class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
 //
 
 class ConditionLockTableSpec extends TableBehaviors with NewConditionLockTable
+
+//
+// Asynchronous Strategies
+//
+
+class FiberizedTableSpec extends AsyncTableBehaviors with NewFiberizedTable
+
+class FiberizedForkJoinTableSpec extends AsyncTableBehaviors with NewFiberizedForkJoinTable
+
+class FiberizedShardedTableSpec extends AsyncTableBehaviors with NewFiberizedShardedTable
+
+class FiberizedShardedForkJoinTableSpec extends AsyncTableBehaviors with NewFiberizedShardedForkJoinTable
