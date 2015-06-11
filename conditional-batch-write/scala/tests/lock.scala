@@ -12,12 +12,12 @@ trait LockBehaviors extends FlatSpec {
     }}
 
   def assertAlive (t: Thread) {
-    Thread.sleep (10)
+    Thread.`yield`()
     assert (t.isAlive)
   }
 
   def assertJoined (t: Thread) {
-    t.join (10)
+    t.join (100)
     assert (!t.isAlive)
   }
 
