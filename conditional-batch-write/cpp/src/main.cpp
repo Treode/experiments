@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <ctime>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <string>
@@ -27,6 +27,10 @@
 #include "lock.hpp"
 #include "table.hpp"
 
+using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
+using std::chrono::microseconds;
 using std::condition_variable;
 using std::cout;
 using std::endl;
@@ -96,16 +100,18 @@ class CountDownLatch {
     unsigned count;
 };
 
-clock_t serial_brokers(const function<Table*(void)> &new_table, const Params &params) {
+high_resolution_clock::duration
+serial_brokers(const function<Table*(void)> &new_table, const Params &params) {
   unique_ptr<Table> table (new_table());
-  auto start = clock();
+  auto start = high_resolution_clock::now();
   for (int i = 0; i < params.nbrokers; ++i)
     broker(*table, params);
-  auto end = clock();
+  auto end = high_resolution_clock::now();
   return end - start;
 }
 
-clock_t parallel_brokers(const function<Table*(void)> &new_table, const Params &params) {
+high_resolution_clock::duration
+parallel_brokers(const function<Table*(void)> &new_table, const Params &params) {
   unique_ptr<Table> table_ptr (new_table());
   auto &table = *table_ptr;
   vector<thread> brokers;
@@ -121,10 +127,10 @@ clock_t parallel_brokers(const function<Table*(void)> &new_table, const Params &
     }));
   }
   ready.wait();
-  auto start = clock();
+  auto start = high_resolution_clock::now();
   gate.signal();
   finished.wait();
-  auto end = clock();
+  auto end = high_resolution_clock::now();
   for (auto &b: brokers)
     b.join();
   return end - start;
@@ -152,10 +158,10 @@ void perf(
   unsigned hits = 0;
   auto limit = clock() + nclocks;
   while (trial < ntrials && hits < nhits && clock() < limit) {
-    double us = parallel ?
+    auto elapsed = parallel ?
       parallel_brokers(new_table, params) :
       serial_brokers(new_table, params);
-    double x = ops / us * (CLOCKS_PER_SEC / 1000);
+    double x = ops * 1000.0 / (double)duration_cast<microseconds>(elapsed).count();
     sum += x;
     ++trial;
     double mean = sum / (double)(trial);
