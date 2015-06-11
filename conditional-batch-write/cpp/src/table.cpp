@@ -23,6 +23,16 @@
 using std::ostream;
 using std::vector;
 
+std::ostream &operator<<(std::ostream &os, const Params p) {
+  os << "platform: " << p.platform
+     << ", nlocks: " << p.nlocks
+     << ", nshards: " << p.nshards
+     << ", naccounts: " << p.naccounts
+     << ", nbrokers: " << p.nbrokers
+     << ", ntransfers: " << p.ntransfers;
+  return os;
+}
+
 ostream &operator<<(ostream &os, const Value &v) {
   os << "Value(" << v.v << ", " << v.t << ")";
   return os;
@@ -64,14 +74,15 @@ unsigned fib(unsigned n) {
   return fib(n-1) + fib(n-2);
 }
 
-unsigned broker(Table &table, unsigned ntransfers) {
+unsigned broker(Table &table, const Params &params) {
 
   std::default_random_engine reng;
   std::uniform_int_distribution<int> racct(0, 100);
   std::uniform_int_distribution<int> ramt(0, 1000);
   unsigned sum = 0;
 
-  for (unsigned i = 0; i < ntransfers; ++i) {
+  auto count = params.ntransfers / params.nbrokers;
+  for (unsigned i = 0; i < count; ++i) {
     int a1 = racct(reng);
     int a2;
     while ((a2 = racct (reng)) == a1);

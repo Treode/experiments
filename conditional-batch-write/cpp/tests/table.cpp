@@ -55,50 +55,49 @@ void expectMoneyConserved(const Table &table) {
   }
 }
 
-void table_behaviors(const function<Table*(void)> &new_table, bool parallel) {
+void table_behaviors(const function<Table*(Params &)> &new_table, bool parallel) {
 
-  size_t nbrokers = 8;
-  size_t ntransfers = 1000;
+  Params params("unknown", 8, 8, 100, 8, 3200);
 
   SECTION("A table should read 0 for any key", "[table]") {
-    unique_ptr<Table> table (new_table());
+    unique_ptr<Table> table (new_table(params));
     expect(*table, 0, {0}, {Value(0, 0)});
     expect(*table, 1, {0}, {Value(0, 0)});
   }
 
   SECTION("A table should read what was put", "[table]") {
-    unique_ptr<Table> table (new_table());
+    unique_ptr<Table> table (new_table(params));
     write(*table, 0, {Row(0, 1)});
     expect(*table, 1, {0}, {Value(1, 1)});
   }
 
   SECTION("A table should read and write batches", "[table]") {
-    unique_ptr<Table> table (new_table());
+    unique_ptr<Table> table (new_table(params));
     write(*table, 0, {Row(0, 1), Row(1, 2)});
     expect(*table, 1, {0, 1}, {Value(1, 1), Value(2, 1)});
   }
 
   SECTION("A table should reject a stale write", "[table]") {
-    unique_ptr<Table> table (new_table());
+    unique_ptr<Table> table (new_table(params));
     write(*table, 0, {Row(0, 1)});
     REQUIRE_THROWS_AS(write(*table, 0, {Row(0,2)}), stale_exception);
     expect(*table, 1, {0}, {Value(1,1)});
   }
 
   SECTION("A table should preserve the money supply running serially", "[table]") {
-    unique_ptr<Table> table (new_table());
-    broker(*table, ntransfers);
+    unique_ptr<Table> table (new_table(params));
+    broker(*table, params);
     expectMoneyConserved(*table);
   }
 
   if (parallel) {
     SECTION("A table should preserve the money supply running in parallel", "[table]") {
-      unique_ptr<Table> table_ptr (new_table());
+      unique_ptr<Table> table_ptr (new_table(params));
       auto &table = *table_ptr;
       vector<thread> brokers;
-      for (int i = 0; i < nbrokers; ++i) {
-        brokers.push_back(thread([&table, ntransfers] {
-          broker(table, ntransfers);
+      for (int i = 0; i < params.nbrokers; ++i) {
+        brokers.push_back(thread([&] {
+          broker(table, params);
         }));
       }
       for (auto &b: brokers)
@@ -109,31 +108,31 @@ void table_behaviors(const function<Table*(void)> &new_table, bool parallel) {
 }
 
 TEST_CASE ("The CppUnorderedMapOfMap should work", "[tables]") {
-  table_behaviors([] {
+  table_behaviors([] (Params &params) {
     return new CppUnorderedMapOfMap();
   }, false);
 }
 
 TEST_CASE ("The StdLockAndTable should work", "[tables]") {
-  table_behaviors([] {
-    return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(128, 16);
+  table_behaviors([] (Params &params) {
+    return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
 
 TEST_CASE ("The StdLockTbbTable should work", "[tables]") {
-  table_behaviors([] {
-    return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(128, 16);
+  table_behaviors([] (Params &params) {
+    return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
 
 TEST_CASE ("The TbbLockStdTable should work", "[tables]") {
-  table_behaviors([] {
-    return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(128, 16);
+  table_behaviors([] (Params &params) {
+    return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
 
 TEST_CASE ("The TbbLockAndTable should work", "[tables]") {
-  table_behaviors([] {
-    return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(128, 16);
+  table_behaviors([] (Params &params) {
+    return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }

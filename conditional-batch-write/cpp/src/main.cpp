@@ -48,8 +48,12 @@ struct PerfResult {
   size_t nbrokers;
   double result;
 
-  PerfResult(const string &_name, const string &_platform, unsigned _nshards, unsigned _nbrokers, double _result):
-    name(_name), platform(_platform), nshards(_nshards), nbrokers(_nbrokers), result(_result)
+  PerfResult(const string &_name, const Params &params, double _result):
+    name(_name),
+    platform(params.platform),
+    nshards(params.nshards),
+    nbrokers(params.nbrokers),
+    result(_result)
   {}
 };
 
@@ -92,27 +96,27 @@ class CountDownLatch {
     unsigned count;
 };
 
-clock_t serial_brokers(const function<Table*(void)> &new_table, size_t nbrokers, size_t ntransfers) {
+clock_t serial_brokers(const function<Table*(void)> &new_table, const Params &params) {
   unique_ptr<Table> table (new_table());
   auto start = clock();
-  for (int i = 0; i < nbrokers; ++i)
-    broker(*table, ntransfers);
+  for (int i = 0; i < params.nbrokers; ++i)
+    broker(*table, params);
   auto end = clock();
   return end - start;
 }
 
-clock_t parallel_brokers(const function<Table*(void)> &new_table, size_t nbrokers, size_t ntransfers) {
+clock_t parallel_brokers(const function<Table*(void)> &new_table, const Params &params) {
   unique_ptr<Table> table_ptr (new_table());
   auto &table = *table_ptr;
   vector<thread> brokers;
-  CountDownLatch ready(nbrokers);
+  CountDownLatch ready(params.nbrokers);
   CountDownLatch gate(1);
-  CountDownLatch finished(nbrokers);
-  for (int i = 0; i < nbrokers; ++i) {
-    brokers.push_back(thread([&, ntransfers] {
+  CountDownLatch finished(params.nbrokers);
+  for (int i = 0; i < params.nbrokers; ++i) {
+    brokers.push_back(thread([&] {
       ready.signal();
       gate.wait();
-      broker(table, ntransfers);
+      broker(table, params);
       finished.signal();
     }));
   }
@@ -129,34 +133,28 @@ clock_t parallel_brokers(const function<Table*(void)> &new_table, size_t nbroker
 void perf(
   const function<Table*(void)> &new_table,
   const string &name,
-  const string &platform,
-  size_t nshards,
-  size_t nbrokers,
   bool parallel,
+  const Params &params,
   vector<PerfResult> &results
 ) {
 
   unsigned nhits = 5;
   unsigned ntrials = 2000;
   unsigned nclocks = 60 * CLOCKS_PER_SEC;
-  unsigned ntransfers = 1000;
   double tolerance = 0.01;
-  double ops = ntransfers * nbrokers;
+  double ops = params.ntransfers;
 
   double sum = 0.0;
 
-  cout << name
-        << ", nshards: " << nshards
-        << ", nbrokers: " << nbrokers
-        << endl;
+  cout << name << ", " << params << endl;
 
   unsigned trial = 0;
   unsigned hits = 0;
   auto limit = clock() + nclocks;
   while (trial < ntrials && hits < nhits && clock() < limit) {
     double us = parallel ?
-      parallel_brokers(new_table, nbrokers, ntransfers) :
-      serial_brokers(new_table, nbrokers, ntransfers);
+      parallel_brokers(new_table, params) :
+      serial_brokers(new_table, params);
     double x = ops / us * (CLOCKS_PER_SEC / 1000);
     sum += x;
     ++trial;
@@ -168,7 +166,7 @@ void perf(
     }
   }
   double mean = sum / (double)(trial);
-  results.push_back (PerfResult(name, platform, nshards, nbrokers, mean));
+  results.push_back (PerfResult(name, params, mean));
 }
 
 int main() {
@@ -187,28 +185,34 @@ int main() {
 
   vector<PerfResult> results;
 
-  perf([] {
-    return new CppUnorderedMapOfMap();
-  }, "CppUnorderedMapOfMap", platform, 1, 1, false, results);
+  {
+    Params params(platform, 128, 1, 100, 1, 6400);
+
+    perf([] {
+      return new CppUnorderedMapOfMap();
+    }, "CppUnorderedMapOfMap", false, params, results);
+  }
 
   for (auto nshards: shards) {
     for (auto nbrokers: brokers) {
 
-      perf([=] {
-        return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "StdLockAndTable", platform, nshards, nbrokers, true, results);
+      Params params(platform, 128, nshards, 100, nbrokers, 6400);
 
-      perf([=] {
-        return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "StdLockTbbTable", platform, nshards, nbrokers, true, results);
+      perf([=, &params] {
+        return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+      }, "StdLockAndTable", true, params, results);
 
-      perf([=] {
-        return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "TbbLockStdTable", platform, nshards, nbrokers, true, results);
+      perf([=, &params] {
+        return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+      }, "StdLockTbbTable", true, params, results);
 
-      perf([=] {
-        return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
-      }, "TbbLockAndTable", platform, nshards, nbrokers, true, results);
+      perf([=, &params] {
+        return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+      }, "TbbLockStdTable", true, params, results);
+
+      perf([=, &params] {
+        return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+      }, "TbbLockAndTable", true, params, results);
     }
   }
 

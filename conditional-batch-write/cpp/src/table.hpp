@@ -25,6 +25,34 @@
 
 #include "tbb/spin_mutex.h"
 
+struct Params {
+
+  std::string platform;
+  size_t nlocks;
+  size_t nshards;
+  size_t naccounts;
+  size_t nbrokers;
+  size_t ntransfers;
+
+  Params(
+    const std::string &_platform,
+    size_t _nlocks,
+    size_t _nshards,
+    size_t _naccounts,
+    size_t _nbrokers,
+    size_t _ntransfers
+  ):
+    platform(_platform),
+    nlocks(_nlocks),
+    nshards(_nshards),
+    naccounts(_naccounts),
+    nbrokers(_nbrokers),
+    ntransfers(_ntransfers)
+  {}
+};
+
+std::ostream &operator<<(std::ostream &os, const Params p);
+
 struct Value {
 
   int v;
@@ -114,7 +142,7 @@ class Table {
 
 std::ostream &operator<<(std::ostream &os, const Table &table);
 
-unsigned broker(Table &table, unsigned ntransfers);
+unsigned broker(Table &table, const Params &params);
 
 class Shard {
 
@@ -199,11 +227,11 @@ class ShardedTable: public Table {
 
   public:
 
-    ShardedTable(size_t nlocks, size_t nshards):
-      size(nshards),
-      mask(nshards-1),
-      shards(nshards),
-      lock(nlocks)
+    ShardedTable(Params &params):
+      size(params.nshards),
+      mask(params.nshards-1),
+      shards(params.nshards),
+      lock(params)
     {}
 
     uint32_t time() const {

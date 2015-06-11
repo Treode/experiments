@@ -41,11 +41,11 @@ class LockSpace {
 
   public:
 
-    LockSpace(size_t nlocks):
-      size(nlocks),
-      mask(nlocks - 1),
+    LockSpace(Params &params):
+      size(params.nlocks),
+      mask(params.nlocks - 1),
       clock(0),
-      locks(nlocks)
+      locks(params.nlocks)
     {}
 
     uint32_t time() {
