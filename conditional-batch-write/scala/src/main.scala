@@ -50,7 +50,7 @@ class PerfResults {
   *
   * Report measurements that are within `tolerance` of the running mean time.
   */
-class TablePerf extends TableTools {
+class SyncTablePerf extends TableTools {
   this: NewTable =>
 
   val ntrials = 2000
@@ -98,22 +98,22 @@ class TablePerf extends TableTools {
 //
 
 class JavaHashMapOfTreeMapPerf (implicit p: Params)
-  extends TablePerf with NewJavaHashMapOfTreeMap
+  extends SyncTablePerf with NewJavaHashMapOfTreeMap
 
 class JavaTreeMapPerf (implicit p: Params)
-  extends TablePerf with NewJavaTreeMap
+  extends SyncTablePerf with NewJavaTreeMap
 
 class ScalaMapOfSortedMapPerf (implicit p: Params)
-  extends TablePerf with NewScalaMapOfSortedMap
+  extends SyncTablePerf with NewScalaMapOfSortedMap
 
 class ScalaMutableMapOfSortedMapPerf (implicit p: Params)
-  extends TablePerf with NewScalaMutableMapOfSortedMap
+  extends SyncTablePerf with NewScalaMutableMapOfSortedMap
 
 class ScalaSortedMapPerf (implicit p: Params)
-  extends TablePerf with NewScalaSortedMap
+  extends SyncTablePerf with NewScalaSortedMap
 
 class TroveHashMapOfTreeMapPerf (implicit p: Params)
-  extends TablePerf with NewTroveHashMapOfTreeMap
+  extends SyncTablePerf with NewTroveHashMapOfTreeMap
 
 //
 // Single-Threaded Scheduler Strategies
@@ -123,16 +123,16 @@ class TroveHashMapOfTreeMapPerf (implicit p: Params)
 //
 
 class SingleThreadExecutorPerf (implicit p: Params)
-  extends TablePerf with NewSingleThreadExecutorTable
+  extends SyncTablePerf with NewSingleThreadExecutorTable
 
 class SimpleQueuePerf (implicit p: Params)
-  extends TablePerf with NewSimpleQueueTable
+  extends SyncTablePerf with NewSimpleQueueTable
 
 class ShardedQueuePerf (implicit p: Params)
-  extends TablePerf with NewShardedQueueTable
+  extends SyncTablePerf with NewShardedQueueTable
 
 class JCToolsQueuePerf (implicit p: Params)
-  extends TablePerf with NewJCToolsQueueTable
+  extends SyncTablePerf with NewJCToolsQueueTable
 
 //
 // Thread-Safe Strategies, using AqsLock
@@ -141,35 +141,35 @@ class JCToolsQueuePerf (implicit p: Params)
 //
 
 class JavaConcurrentSkipListMapPerf (implicit p: Params)
-  extends TablePerf with NewJavaConcurrentSkipListMap
+  extends SyncTablePerf with NewJavaConcurrentSkipListMap
 
 class SynchronizedTablePerf (implicit p: Params)
-  extends TablePerf  with NewSynchronizedTable
+  extends SyncTablePerf  with NewSynchronizedTable
 
 class SynchronizedShardedTablePerf (implicit p: Params)
-  extends TablePerf with NewSynchronizedShardedTable
+  extends SyncTablePerf with NewSynchronizedShardedTable
 
 class ReadWriteShardedTablePerf (implicit p: Params)
-  extends TablePerf with NewReadWriteShardedTable
+  extends SyncTablePerf with NewReadWriteShardedTable
 
 class SingleThreadShardedTablePerf (implicit p: Params)
-  extends TablePerf with NewSingleThreadShardedTable
+  extends SyncTablePerf with NewSingleThreadShardedTable
 
 class FutureShardedTablePerf (implicit p: Params)
-  extends TablePerf with NewFutureShardedTable
+  extends SyncTablePerf with NewFutureShardedTable
 
 class CollectorShardedTablePerf (implicit p: Params)
-  extends TablePerf with NewCollectorShardedTable
+  extends SyncTablePerf with NewCollectorShardedTable
 
 class DisruptorTablePerf (implicit p: Params)
-  extends TablePerf with NewDisruptorTable
+  extends SyncTablePerf with NewDisruptorTable
 
 //
 // Alternative Logical-Lock strategies, using SynchronizedShardedTable
 //
 
 class ConditionLockPerf (implicit p: Params)
-  extends TablePerf with NewConditionLockTable
+  extends SyncTablePerf with NewConditionLockTable
 
 object Main {
 
