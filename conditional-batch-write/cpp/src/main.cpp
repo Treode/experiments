@@ -21,8 +21,8 @@
 #include <thread>
 #include <vector>
 
-#include "ConditionLock.hpp"
 #include "CppUnorderedMapOfMap.hpp"
+#include "StdConditionLock.hpp"
 #include "TbbConditionLock.hpp"
 #include "lock.hpp"
 #include "table.hpp"
@@ -195,15 +195,15 @@ int main() {
     for (auto nbrokers: brokers) {
 
       perf([=] {
-        return new ShardedTable<LockSpace<ConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+        return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
       }, "StdLockAndTable", platform, nshards, nbrokers, true, results);
 
       perf([=] {
-        return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+        return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
       }, "StdLockTbbTable", platform, nshards, nbrokers, true, results);
 
       perf([=] {
-        return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
+        return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(1024, nshards);
       }, "TbbLockStdTable", platform, nshards, nbrokers, true, results);
 
       perf([=] {

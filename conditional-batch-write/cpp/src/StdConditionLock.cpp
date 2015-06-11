@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#include "ConditionLock.hpp"
+#include "StdConditionLock.hpp"
 
 using std::lock_guard;
 using std::mutex;
 using std::unique_lock;
 
-uint32_t ConditionLock::time() {
+uint32_t StdConditionLock::time() {
   lock_guard<mutex> acqn(lock);
   return getTime(state);
 }
 
-void ConditionLock::read(uint32_t time) {
+void StdConditionLock::read(uint32_t time) {
   unique_lock<mutex> acqn(lock);
   while (true) {
     if (time <= getTime(state))
@@ -40,7 +40,7 @@ void ConditionLock::read(uint32_t time) {
   }
 }
 
-uint32_t ConditionLock::write(uint32_t time) {
+uint32_t StdConditionLock::write(uint32_t time) {
   unique_lock<mutex> acqn(lock);
   while (isHeld(state))
     writers.wait(acqn);
@@ -51,7 +51,7 @@ uint32_t ConditionLock::write(uint32_t time) {
   return now;
 }
 
-void ConditionLock::release(uint32_t time) {
+void StdConditionLock::release(uint32_t time) {
   {
     lock_guard<mutex> acqn(lock);
     if (future < time)

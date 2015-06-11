@@ -19,8 +19,8 @@
 #include <thread>
 #include <vector>
 
-#include "ConditionLock.hpp"
 #include "CppUnorderedMapOfMap.hpp"
+#include "StdConditionLock.hpp"
 #include "TbbConditionLock.hpp"
 #include "catch.hpp"
 #include "lock.hpp"
@@ -116,13 +116,13 @@ TEST_CASE ("The CppUnorderedMapOfMap should work", "[tables]") {
 
 TEST_CASE ("The StdLockAndTable should work", "[tables]") {
   table_behaviors([] {
-    return new ShardedTable<LockSpace<ConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(128, 16);
+    return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(128, 16);
   }, true);
 }
 
 TEST_CASE ("The StdLockTbbTable should work", "[tables]") {
   table_behaviors([] {
-    return new ShardedTable<LockSpace<ConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(128, 16);
+    return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(128, 16);
   }, true);
 }
 

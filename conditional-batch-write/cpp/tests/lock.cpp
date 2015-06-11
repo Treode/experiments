@@ -17,9 +17,10 @@
 #include <chrono>
 #include <functional>
 #include <future>
+#include <memory>
 #include <thread>
 
-#include "ConditionLock.hpp"
+#include "StdConditionLock.hpp"
 #include "TbbConditionLock.hpp"
 #include "catch.hpp"
 
@@ -35,6 +36,7 @@ using std::mutex;
 using std::this_thread::yield;
 using std::thread;
 using std::unique_lock;
+using std::unique_ptr;
 
 /** Repeat the test many times. */
 void repeat(const function<void()> &body) {
@@ -56,8 +58,9 @@ void require_ready (future<T> &f) {
 void lock_behaviors(const function<Lock*(void)> &new_lock) {
 
   SECTION("A lock should block a later writer", "[lock]") {
-    repeat ([]{
-      ConditionLock lock;
+    repeat ([&new_lock]{
+      unique_ptr<Lock> lock_ptr (new_lock());
+      auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
         return lock.write(2);
@@ -70,8 +73,9 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
   }
 
   SECTION("A lock should block a later writer and raise the time", "[lock]") {
-    repeat ([] {
-      ConditionLock lock;
+    repeat ([&new_lock] {
+      unique_ptr<Lock> lock_ptr (new_lock());
+      auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
         return lock.write(2);
@@ -84,8 +88,9 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
   }
 
   SECTION("A lock should block an earlier writer and raise the time", "[lock]") {
-    repeat ([] {
-      ConditionLock lock;
+    repeat ([&new_lock] {
+      unique_ptr<Lock> lock_ptr (new_lock());
+      auto &lock = *lock_ptr;
       lock.write(2);
       auto f = async([&lock] {
         return lock.write(1);
@@ -98,8 +103,9 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
   }
 
   SECTION("A lock should block a later reader", "[lock]") {
-    repeat ([] {
-      ConditionLock lock;
+    repeat ([&new_lock] {
+      unique_ptr<Lock> lock_ptr (new_lock());
+      auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
         lock.read(2);
@@ -113,8 +119,9 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
   }
 
   SECTION("A lock should block a later reader and raise the time", "[lock]") {
-    repeat ([] {
-      ConditionLock lock;
+    repeat ([&new_lock] {
+      unique_ptr<Lock> lock_ptr (new_lock());
+      auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
         lock.read(3);
@@ -129,8 +136,9 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
   }
 
   SECTION("A lock should permit an earlier reader", "[lock]") {
-    repeat ([] {
-      ConditionLock lock;
+    repeat ([&new_lock] {
+      unique_ptr<Lock> lock_ptr (new_lock());
+      auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
         lock.read(1);
@@ -142,9 +150,9 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
   }
 }
 
-TEST_CASE ("The ConditionLock should work", "[locks]") {
+TEST_CASE ("The StdConditionLock should work", "[locks]") {
   lock_behaviors([] {
-    return new ConditionLock();
+    return new StdConditionLock();
   });
 }
 

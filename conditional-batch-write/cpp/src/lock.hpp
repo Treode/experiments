@@ -24,13 +24,15 @@
 
 class Lock {
 
-  virtual uint32_t time() = 0;
+  public:
 
-  virtual void read(uint32_t time) = 0;
+    virtual uint32_t time() = 0;
 
-  virtual uint32_t write(uint32_t time) = 0;
+    virtual void read(uint32_t time) = 0;
 
-  virtual void release(uint32_t time) = 0;
+    virtual uint32_t write(uint32_t time) = 0;
+
+    virtual void release(uint32_t time) = 0;
 };
 
 // L is a Lock.

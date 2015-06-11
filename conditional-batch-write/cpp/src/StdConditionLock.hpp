@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef CONDITION_LOCK_HPP
-#define CONDITION_LOCK_HPP
+#ifndef STD_CONDITION_LOCK_HPP
+#define STD_CONDITION_LOCK_HPP
 
 #import <condition_variable>
 #import <mutex>
 
 #import "Lock.hpp"
 
-class ConditionLock: public Lock {
+class StdConditionLock: public Lock {
 
   public:
 
@@ -58,4 +58,4 @@ class ConditionLock: public Lock {
     uint32_t future = 0;
 };
 
-#endif // CONDITION_LOCK_HPP
+#endif // STD_CONDITION_LOCK_HPP
