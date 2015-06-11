@@ -16,14 +16,19 @@
 
 #include <chrono>
 #include <functional>
+#include <future>
 #include <thread>
 
 #include "ConditionLock.hpp"
 #include "TbbConditionLock.hpp"
 #include "catch.hpp"
 
+using std::async;
 using std::chrono::milliseconds;
 using std::condition_variable;
+using std::future;
+using std::future_status::ready;
+using std::future_status::timeout;
 using std::function;
 using std::lock_guard;
 using std::mutex;
@@ -31,55 +36,21 @@ using std::this_thread::yield;
 using std::thread;
 using std::unique_lock;
 
-/** A thread that signals its exit. */
-class spawn {
-
-  public:
-
-    explicit spawn(const function<uint32_t()> &body):
-      child([this, &body] {
-        auto result = body();
-        lock_guard<mutex> acqn(lock);
-        exited = true;
-        actual = result;
-        cond.notify_one();
-      })
-    {
-      child.detach();
-    }
-
-    /** Must be invoked in the main thread. */
-    void assert_alive() {
-      yield();
-      lock_guard<mutex> acqn(lock);
-      REQUIRE(!exited);
-    }
-
-    /** Must be invoked in the main thread. */
-    void assert_exited (uint32_t expected) {
-      unique_lock<mutex> acqn(lock);
-      if (!exited)
-        cond.wait_for(acqn, milliseconds(10));
-      REQUIRE(exited);
-      REQUIRE(actual == expected);
-    }
-
-  private:
-
-    mutex lock;
-    condition_variable cond;
-    bool exited = false;
-    uint32_t actual = 0;
-
-    // This must be declared last so that it is initialize (started) after the other members have
-    // been initialized. Otherwise, we create opportunites for races.
-    thread child;
-};
-
 /** Repeat the test many times. */
 void repeat(const function<void()> &body) {
   for (int i = 0; i < 100; ++i)
     body();
+}
+
+template <typename T>
+void require_alive (future<T> &f) {
+  yield();
+  REQUIRE(f.wait_for(milliseconds(0)) == timeout);
+}
+
+template <typename T>
+void require_ready (future<T> &f) {
+  REQUIRE(f.wait_for(milliseconds(10)) == ready);
 }
 
 void lock_behaviors(const function<Lock*(void)> &new_lock) {
@@ -88,12 +59,13 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
     repeat ([]{
       ConditionLock lock;
       lock.write(1);
-      spawn t([&lock] {
+      auto f = async([&lock] {
         return lock.write(2);
       });
-      t.assert_alive();
+      require_alive(f);
       lock.release(2);
-      t.assert_exited(2);
+      require_ready(f);
+      REQUIRE(f.get() == 2);
     });
   }
 
@@ -101,12 +73,13 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
     repeat ([] {
       ConditionLock lock;
       lock.write(1);
-      spawn t([&lock] {
+      auto f = async([&lock] {
         return lock.write(2);
       });
-      t.assert_alive();
+      require_alive(f);
       lock.release(3);
-      t.assert_exited(3);
+      require_ready(f);
+      REQUIRE(f.get() == 3);
     });
   }
 
@@ -114,12 +87,13 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
     repeat ([] {
       ConditionLock lock;
       lock.write(2);
-      spawn t([&lock] {
+      auto f = async([&lock] {
         return lock.write(1);
       });
-      t.assert_alive();
+      require_alive(f);
       lock.release(3);
-      t.assert_exited(3);
+      require_ready(f);
+      REQUIRE(f.get() == 3);
     });
   }
 
@@ -127,13 +101,14 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
     repeat ([] {
       ConditionLock lock;
       lock.write(1);
-      spawn t([&lock] {
+      auto f = async([&lock] {
         lock.read(2);
         return 0;
       });
-      t.assert_alive();
+      require_alive(f);
       lock.release(2);
-      t.assert_exited(0);
+      require_ready(f);
+      REQUIRE(f.get() == 0);
     });
   }
 
@@ -141,26 +116,28 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
     repeat ([] {
       ConditionLock lock;
       lock.write(1);
-      spawn t([&lock] {
+      auto f = async([&lock] {
         lock.read(3);
         return 0;
       });
-      t.assert_alive();
+      require_alive(f);
       lock.release(2);
-      t.assert_exited(0);
+      require_ready(f);
+      REQUIRE(f.get() == 0);
       REQUIRE(lock.write(2) == 3);
     });
   }
 
-  SECTION("A lock should an earlier reader", "[lock]") {
+  SECTION("A lock should permit an earlier reader", "[lock]") {
     repeat ([] {
       ConditionLock lock;
       lock.write(1);
-      spawn t([&lock] {
+      auto f = async([&lock] {
         lock.read(1);
         return 0;
       });
-      t.assert_exited(0);
+      require_ready(f);
+      REQUIRE(f.get() == 0);
     });
   }
 }
