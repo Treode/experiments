@@ -24,7 +24,7 @@ import scala.util.Random
 
 trait AsyncTable {
 
-  def time (cb: Int => Any)
+  def time: Int
 
   /** Read keys `ks` as of time `t`. */
   def read (t: Int, ks: Int*) (cb: Seq [Value] => Any)
@@ -68,20 +68,21 @@ trait AsyncTableTools {
       val n = random.nextInt (1000)
 
       // Do the transfer
-      table.time { rt =>
-        table.read (rt, a1, a2) { case Seq (v1, v2) =>
-          table.write (rt, Row (a1, v1.v - n), Row (a2, v2.v + n)) { r =>
-            r match {
-              case Right (_) => nstale += 1
-              case _ => ()
-            }
-            itransfer += 1
-            if (itransfer < ntransfers) {
-              scheduler.execute (transfer())
-            } else {
-              assert (nstale < ntransfers)
-              cb (())
-            }}}}}
+      val rt = table.time
+      table.read (rt, a1, a2) { case Seq (v1, v2) =>
+        table.write (rt, Row (a1, v1.v - n), Row (a2, v2.v + n)) { r =>
+          r match {
+            case Right (_) => nstale += 1
+            case _ => ()
+          }
+          itransfer += 1
+          if (itransfer < ntransfers) {
+            scheduler.execute (transfer())
+          } else {
+            assert (nstale < ntransfers)
+            cb (())
+          }}}}
+
     transfer()
   }
 
@@ -104,12 +105,8 @@ class FiberizedTable (table: Table) (implicit scheduler: Scheduler) extends Asyn
 
   private val fiber = new Fiber (scheduler)
 
-  def time (cb: Int => Any): Unit = {
-    fiber.execute {
-      val t = table.time
-      cb (t)
-    }
-  }
+  def time: Int =
+    table.time
 
   def read (t: Int, ks: Int*) (cb: Seq [Value] => Any): Unit = {
     fiber.execute {
@@ -159,10 +156,8 @@ class AsyncLock (implicit scheduler: Scheduler) {
   private var writers = List.empty [Int => Any]
   private var held: Boolean = false
 
-  def time (cb: Int => Any): Unit = {
-    val t = synchronized (clock)
-    scheduler.execute (cb (t))
-  }
+  def time: Int =
+    synchronized (clock)
 
   def read (t: Int) (cb: Unit => Any) {
     val r =
@@ -231,7 +226,7 @@ class AsyncLock (implicit scheduler: Scheduler) {
 
 trait AsyncLockSpace {
 
-  def time (cb: Int => Any)
+  def time: Int
 
   def read (t: Int, ks: Seq [Int]) (cb: Unit => Any)
 
@@ -248,8 +243,8 @@ object AsyncLockSpace {
 
     private var lock = new AsyncLock
 
-    def time (cb: Int => Any): Unit =
-      lock.time (cb)
+    def time: Int =
+      lock.time
 
     def read (t: Int, ks: Seq [Int]) (cb: Unit => Any): Unit =
       lock.read (t) (cb)
@@ -260,9 +255,10 @@ object AsyncLockSpace {
     def release (t: Int, rs: Seq [Row]): Unit =
       lock.release (t)
 
-    def scan (cb: Int => Any): Unit =
-      lock.time (t => lock.read (t) (_ => cb (t)))
-  }
+    def scan (cb: Int => Any) {
+      val t = lock.time
+      lock.read (t) (_ => cb (t))
+    }}
 
   private class MultiLock (mask: Int) (implicit scheduler: Scheduler) extends AsyncLockSpace {
 
@@ -275,10 +271,8 @@ object AsyncLockSpace {
         now = clock.get
     }
 
-    def time (cb: Int => Any) {
-      val t = clock.get
-      scheduler.execute (cb (t))
-    }
+    def time: Int =
+      clock.get
 
     def read (t: Int, ks: Seq [Int]) (cb: Unit => Any) {
       raise (t)
@@ -402,7 +396,8 @@ class AsyncShardedTable (
   private val lock = AsyncLockSpace()
   private val shards = Array.fill (mask + 1) (newShard)
 
-  def time (cb: Int => Any) = lock.time (cb)
+  def time: Int =
+    lock.time
 
   private def read (t: Int, k: Int) (cb: Value => Any): Unit =
     shards (k & mask) .read (t, k) (cb)
