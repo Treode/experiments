@@ -69,10 +69,14 @@ class CountDownLatch {
     CountDownLatch(unsigned _count): count(_count) {}
 
     void signal() {
-      lock_guard<mutex> acqn(lock);
-      if (count > 0)
-        --count;
-      if (count == 0)
+      unsigned _count;
+      {
+        lock_guard<mutex> acqn(lock);
+        if (count > 0)
+          --count;
+        _count = count;
+      }
+      if (_count == 0)
         cond.notify_all();
     }
 

@@ -52,10 +52,12 @@ uint32_t ConditionLock::write(uint32_t time) {
 }
 
 void ConditionLock::release(uint32_t time) {
-  lock_guard<mutex> acqn(lock);
-  if (future < time)
-    future = time;
-  state = makeState(future, false);
+  {
+    lock_guard<mutex> acqn(lock);
+    if (future < time)
+      future = time;
+    state = makeState(future, false);
+  }
   readers.notify_all();
   writers.notify_one();
 }
