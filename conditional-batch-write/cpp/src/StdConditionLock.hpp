@@ -17,10 +17,11 @@
 #ifndef STD_CONDITION_LOCK_HPP
 #define STD_CONDITION_LOCK_HPP
 
-#import <condition_variable>
-#import <mutex>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 
-#import "Lock.hpp"
+#include "lock.hpp"
 
 class StdConditionLock: public Lock {
 

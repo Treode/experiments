@@ -17,11 +17,12 @@
 #ifndef TBB_CONDITION_LOCK_HPP
 #define TBB_CONDITION_LOCK_HPP
 
-#import <condition_variable>
-#import <mutex>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 #include "tbb/spin_mutex.h"
-#import "Lock.hpp"
+#include "lock.hpp"
 
 class TbbConditionLock: public Lock {
 

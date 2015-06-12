@@ -14,6 +14,11 @@
 # limitations under the License.
 #
 
+# Ubuntu Options
+# CFLAGS = -std=c++11 -pthread
+# LDFLAGS = -ltbb -lpthread -Wl,--no-as-needed
+
+# Mac / XCode Options
 CFLAGS = -std=c++11
 LDFLAGS = -ltbb
 
