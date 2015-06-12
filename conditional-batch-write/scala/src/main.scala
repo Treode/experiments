@@ -231,19 +231,17 @@ object Main {
 
   // Handle concurrency some other way.
   def concurrent (results: PerfResults) (implicit params: Params) {
-    results += (new SynchronizedTablePerf).perf()
     results += (new JavaConcurrentSkipListMapPerf).perf()
+  }
+
+  def concurrentSharded (results: PerfResults) (implicit params: Params) {
+    results += (new SynchronizedTablePerf).perf()
     results += (new SynchronizedShardedTablePerf).perf()
     results += (new ReadWriteShardedTablePerf).perf()
     results += (new SingleThreadShardedTablePerf).perf()
     results += (new FutureShardedTablePerf).perf()
     results += (new CollectorShardedTablePerf).perf()
     results += (new DisruptorTablePerf).perf()
-  }
-
-  // Alternative locking strategies.
-  def locks (results: PerfResults) (implicit params: Params) {
-    results += (new ConditionLockPerf).perf()
   }
 
   // Asynchronous strategies.
@@ -255,6 +253,11 @@ object Main {
   def asynchronousSharded (results: PerfResults) (implicit params: Params) {
     results += (new FiberizedShardedTablePerf).perf()
     results += (new FiberizedShardedForkJoinTablePerf).perf()
+  }
+
+  // Alternative strategies for the logical clock lock.
+  def locks (results: PerfResults) (implicit params: Params) {
+    results += (new ConditionLockPerf).perf()
   }
 
   def main (args: Array [String]) {
@@ -276,18 +279,18 @@ object Main {
 
     for (nshards <- shards)
       for (nbrokers <- brokers)
-        concurrent (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
-
-    for (nshards <- shards)
-      for (nbrokers <- brokers)
         locks (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
 
-    for (nbrokers <- brokers)
+    for (nbrokers <- brokers) {
+      concurrent (results) (params.copy (nbrokers = nbrokers))
       asynchronous (results) (params.copy (nbrokers = nbrokers))
+    }
 
     for (nshards <- shards)
-      for (nbrokers <- brokers)
+      for (nbrokers <- brokers) {
+        concurrentSharded (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
         asynchronousSharded (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
+      }
 
     println ("--")
     println (results)
