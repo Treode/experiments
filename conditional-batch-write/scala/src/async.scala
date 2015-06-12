@@ -55,10 +55,11 @@ trait AsyncTableTools {
 
   def broker (table: AsyncTable) (cb: Unit => Any) (implicit params: Params, scheduler: Scheduler) {
 
-    import params.{naccounts, ntransfers}
+    import params.{naccounts, nbrokers, ntransfers}
+    val limit = ntransfers / nbrokers
     val random = new Random
     var nstale = 0
-    var itransfer = 0
+    var count = 0
 
     def transfer() {
       // Two accounts and an amount to transfer from a1 to a2
@@ -75,11 +76,11 @@ trait AsyncTableTools {
             case Right (_) => nstale += 1
             case _ => ()
           }
-          itransfer += 1
-          if (itransfer < ntransfers) {
+          count += 1
+          if (count < limit) {
             scheduler.execute (transfer())
           } else {
-            assert (nstale < ntransfers)
+            assert (nstale < limit)
             cb (())
           }}}}
 
