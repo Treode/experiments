@@ -134,7 +134,6 @@ class TroveHashMapOfTreeMapPerf (implicit p: Params)
 //
 // Single-Threaded Scheduler Strategies
 //
-//
 // Queue tasks onto a single thread.
 //
 
@@ -155,6 +154,9 @@ class JCToolsQueuePerf (implicit p: Params)
 //
 // Handle concurrency some other way.
 //
+
+class JavaArrayListPerf (implicit p: Params)
+  extends SyncTablePerf with NewJavaArrayList
 
 class JavaConcurrentSkipListMapPerf (implicit p: Params)
   extends SyncTablePerf with NewJavaConcurrentSkipListMap
@@ -232,6 +234,7 @@ object Main {
   // Handle concurrency some other way.
   def concurrent (results: PerfResults) (implicit params: Params) {
     results += (new JavaConcurrentSkipListMapPerf).perf()
+    results += (new JavaArrayListPerf).perf() (params.copy (nshards = params.nlocks))
   }
 
   def concurrentSharded (results: PerfResults) (implicit params: Params) {
