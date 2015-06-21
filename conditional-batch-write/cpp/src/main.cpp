@@ -195,7 +195,7 @@ int main() {
     Params params(platform, 128, 1, 100, 1, 6400);
 
     perf([] {
-      return new CppUnorderedMapOfMap();
+      return new TableFromShard<CppUnorderedMapOfMap>();
     }, "CppUnorderedMapOfMap", false, params, results);
   }
 

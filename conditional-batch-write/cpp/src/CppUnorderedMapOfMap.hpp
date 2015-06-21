@@ -23,44 +23,48 @@
 
 #include "table.hpp"
 
-class CppUnorderedMapOfMap: public Table, Shard {
+class CppUnorderedMapOfMap: public Shard {
 
   public:
 
-    uint32_t time() const {
-      return clock;
+    void read (uint32_t t, int k, Value &v) const {
+      auto i = table.find(k);
+      if (i == table.end()) {
+        v = Value(0, 0);
+        return;
+      }
+      auto j = i->second.lower_bound(UINT32_MAX - t);
+      if (j == i->second.end()) {
+        v = Value(0, 0);
+        return;
+      }
+      v = Value(j->second, UINT32_MAX - j->first);
     }
 
-    Value read (uint32_t t, int k) const;
+    uint32_t prepare(int k) const {
+      auto i = table.find(k);
+      if (i == table.end())
+        return 0;
+      return UINT32_MAX - i->second.begin()->first;
+    }
 
-    void read(uint32_t t, size_t n, const int *ks, Value *vs) const;
+    void commit(uint32_t t, int k, int v) {
+      table[k][UINT32_MAX - t] = v;
+    }
 
-    uint32_t prepare(const Row &r) const;
-
-    void commit(uint32_t t, const Row &r);
-
-    uint32_t write(uint32_t t, size_t n, const Row *rs);
-
-    std::vector<Cell> scan (uint32_t t) const;
-
-    std::vector<Cell> scan() const;
+    void scan (uint32_t t, std::vector<Cell> &cs) const {
+      for (auto kvs: table) {
+        for (auto v: kvs.second) {
+          auto t2 = UINT32_MAX - v.first;
+          if (t2 <= t)
+            cs.emplace_back(kvs.first, v.second, t2);
+        }
+      }
+    }
 
   private:
 
-    mutable uint32_t clock = 0;
-
     std::unordered_map<int, std::map<uint32_t, int>> table;
-
-    void raise(uint32_t t) const {
-      if (clock < t)
-        clock = t;
-    }
-
-    void prepare(uint32_t t, size_t n, const Row *rs) const;
-
-    uint32_t commit(size_t n, const Row *rs);
-
-    std::vector<Cell> _scan (uint32_t t) const;
 };
 
 #endif // CPP_UNORDERED_MAP_OF_MAP_HPP

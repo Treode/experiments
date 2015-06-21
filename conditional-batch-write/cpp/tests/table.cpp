@@ -109,7 +109,7 @@ void table_behaviors(const function<Table*(Params &)> &new_table, bool parallel)
 
 TEST_CASE ("The CppUnorderedMapOfMap should work", "[tables]") {
   table_behaviors([] (Params &params) {
-    return new CppUnorderedMapOfMap();
+    return new TableFromShard<CppUnorderedMapOfMap>();
   }, false);
 }
 

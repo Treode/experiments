@@ -58,7 +58,7 @@ struct Value {
   int v;
   uint32_t t;
 
-  Value() {}
+  constexpr Value(): v(0), t(0) {}
 
   constexpr Value(int _v, uint32_t _t): v(_v), t(_t) {}
 };
@@ -75,6 +75,8 @@ struct Row {
 
   int k, v;
 
+  constexpr Row(): k(0), v(0) {}
+
   constexpr Row(int _k, int _v): k(_k), v(_v) {}
 };
 
@@ -90,6 +92,8 @@ struct Cell {
 
   int k, v;
   uint32_t t;
+
+  constexpr Cell(): k(0), v(0), t(0) {}
 
   constexpr Cell(int _k, int _v, uint32_t _t): k(_k), v(_v), t(_t) {}
 };
@@ -115,48 +119,19 @@ class stale_exception: public std::runtime_error {
     {}
 };
 
-class Table {
-
-  public:
-
-    virtual ~Table() = default;
-
-    virtual uint32_t time() const = 0;
-
-    virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) const = 0;
-
-    virtual uint32_t write(uint32_t t, size_t n, const Row *rs) = 0;
-
-    virtual std::vector<Cell> scan() const =  0;
-
-    std::vector<Value> read(uint32_t t, const std::vector<int> &ks) const {
-      auto vs = std::vector<Value>(ks.size());
-      read(t, ks.size(), ks.data(), vs.data());
-      return vs;
-    }
-
-    uint32_t write(uint32_t t, const std::vector<Row> &rs) {
-      return write(t, rs.size(), rs.data());
-    }
-};
-
-std::ostream &operator<<(std::ostream &os, const Table &table);
-
-unsigned broker(Table &table, const Params &params);
-
 class Shard {
 
   public:
 
     virtual ~Shard() = default;
 
-    virtual Value read(uint32_t t, int k) const = 0;
+    virtual void read(uint32_t t, int k, Value &v) const = 0;
 
-    virtual uint32_t prepare(const Row &r) const = 0;
+    virtual uint32_t prepare(int k) const = 0;
 
-    virtual void commit(uint32_t t, const Row &r) = 0;
+    virtual void commit(uint32_t t, int k, int v) = 0;
 
-    virtual std::vector<Cell> scan(uint32_t t) const = 0;
+    virtual void scan(uint32_t t, std::vector<Cell> &cs) const = 0;
 };
 
 // S is a shard
@@ -165,24 +140,24 @@ class StdMutexShard: public Shard {
 
   public:
 
-    Value read(uint32_t t, int k) const {
+    void read(uint32_t t, int k, Value &v) const {
       std::lock_guard<std::mutex> acqn(lock);
-      return shard.read(t, k);
+      shard.read(t, k, v);
     }
 
-    uint32_t prepare(const Row &r) const {
+    uint32_t prepare(int k) const {
       std::lock_guard<std::mutex> acqn(lock);
-      return shard.prepare(r);
+      return shard.prepare(k);
     }
 
-    void commit(uint32_t t, const Row &r) {
+    void commit(uint32_t t, int k, int v) {
       std::lock_guard<std::mutex> acqn(lock);
-      shard.commit(t, r);
+      shard.commit(t, k, v);
     }
 
-    std::vector<Cell> scan(uint32_t t) const {
+    void scan(uint32_t t, std::vector<Cell> &cs) const {
       std::lock_guard<std::mutex> acqn(lock);
-      return shard.scan(t);
+      return shard.scan(t, cs);
     }
 
   private:
@@ -196,29 +171,118 @@ class TbbMutexShard: public Shard {
 
   public:
 
-    Value read(uint32_t t, int k) const {
+    void read(uint32_t t, int k, Value &v) const {
       tbb::spin_mutex::scoped_lock acqn(lock);
-      return shard.read(t, k);
+      shard.read(t, k, v);
     }
 
-    uint32_t prepare(const Row &r) const {
+    uint32_t prepare(int k) const {
       tbb::spin_mutex::scoped_lock acqn(lock);
-      return shard.prepare(r);
+      return shard.prepare(k);
     }
 
-    void commit(uint32_t t, const Row &r) {
+    void commit(uint32_t t, int k, int v) {
       tbb::spin_mutex::scoped_lock acqn(lock);
-      shard.commit(t, r);
+      shard.commit(t, k, v);
     }
 
-    std::vector<Cell> scan(uint32_t t) const {
+    void scan(uint32_t t, std::vector<Cell> &cs) const {
       tbb::spin_mutex::scoped_lock acqn(lock);
-      return shard.scan(t);
+      return shard.scan(t, cs);
     }
 
   private:
     S shard;
     mutable tbb::spin_mutex lock;
+};
+
+class Table {
+
+  public:
+
+    virtual ~Table() = default;
+
+    virtual uint32_t time() const = 0;
+
+    virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) const = 0;
+
+    virtual uint32_t write(uint32_t t, size_t n, const Row *rs) = 0;
+
+    virtual void scan(std::vector<Cell> &cs) const =  0;
+
+    std::vector<Value> read(uint32_t t, const std::vector<int> &ks) const {
+      auto vs = std::vector<Value>(ks.size());
+      read(t, ks.size(), ks.data(), vs.data());
+      return vs;
+    }
+
+    uint32_t write(uint32_t t, const std::vector<Row> &rs) {
+      return write(t, rs.size(), rs.data());
+    }
+
+    std::vector<Cell> scan() const {
+      std::vector<Cell> cs;
+      scan(cs);
+      return cs;
+    }
+};
+
+std::ostream &operator<<(std::ostream &os, const Table &table);
+
+// S is a shard
+template<typename S>
+class TableFromShard: public Table {
+
+  public:
+
+    uint32_t time() const {
+      return clock;
+    }
+
+    void read(uint32_t t, size_t n, const int *ks, Value *vs) const {
+      raise(t);
+      for (size_t i = 0; i < n; ++i)
+        shard.read(t, ks[i], vs[i]);
+    }
+
+    uint32_t write(uint32_t t, size_t n, const Row *rs) {
+      raise(t);
+      prepare(t, n, rs);
+      return commit(n, rs);
+    }
+
+    void scan(std::vector<Cell> &cs) const {
+      shard.scan(clock, cs);
+    }
+
+  private:
+
+    mutable uint32_t clock = 0;
+
+    S shard;
+
+    void raise(uint32_t t) const {
+      if (clock < t)
+        clock = t;
+    }
+
+    void prepare(uint32_t t, size_t n, const Row *rs) const {
+      uint32_t max = 0;
+      for (size_t i = 0; i < n; ++i) {
+        auto t2 = shard.prepare(rs[i].k);
+        if (max < t2)
+          max = t2;
+      }
+      if (max > t)
+        throw stale_exception(t, max);
+    }
+
+    uint32_t commit(size_t n, const Row *rs) {
+      auto t = ++clock;
+      for (size_t i = 0; i < n; ++i)
+        shard.commit(clock, rs[i].k, rs[i].v);
+      return clock;
+    }
 };
 
 // L is a LockSpace. S is a Shard.
@@ -242,7 +306,7 @@ class ShardedTable: public Table {
       lock.read(t, n, ks);
       for (size_t i = 0; i < n; ++i) {
         auto k = ks[i];
-        vs[i] = shards[k & mask].read(t, k);
+        shards[k & mask].read(t, k, vs[i]);
       }
     }
 
@@ -251,7 +315,7 @@ class ShardedTable: public Table {
       auto max = 0;
       for (size_t i = 0; i < n; ++i) {
         auto k = rs[i].k;
-        auto t2 = shards[k & mask].prepare(rs[i]);
+        auto t2 = shards[k & mask].prepare(rs[i].k);
         if (max < t2)
           max = t2;
       }
@@ -260,23 +324,18 @@ class ShardedTable: public Table {
         throw stale_exception(t, max);
       }
       for (size_t i = 0; i < n; ++i) {
-        auto k = rs[i].k;
-        shards[k & mask].commit(wt, rs[i]);
+        auto &r = rs[i];
+        shards[r.k & mask].commit(wt, r.k, r.v);
       }
       lock.release(wt, n, rs);
       return wt;
     }
 
-    std::vector<Cell> scan() const {
-      auto now = time();
-      lock.scan(now);
-      std::vector<Cell> cs;
-      auto it = back_inserter(cs);
-      for (size_t i = 0; i < size; ++i) {
-        auto cs2 = shards[i].scan(now);
-        std::copy(cs2.begin(), cs2.end(), it);
-      }
-      return cs;
+    void scan(std::vector<Cell> &cs) const {
+      auto t = time();
+      lock.scan(t);
+      for (size_t i = 0; i < size; ++i)
+        shards[i].scan(t, cs);
     }
 
   private:
@@ -286,5 +345,7 @@ class ShardedTable: public Table {
     std::vector<S> shards;
     mutable L lock;
 };
+
+unsigned broker(Table &table, const Params &params);
 
 #endif // TABLE_HPP
