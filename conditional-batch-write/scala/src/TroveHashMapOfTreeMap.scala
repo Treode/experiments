@@ -25,17 +25,9 @@ import scala.collection.JavaConversions._
   * `t' = Int.MaxValue - x`, so searching for the ceiling of `Int.MaxValue` will find the the most
   * recent value for the key. This is not thread safe.
   */
-class TroveHashMapOfTreeMap (implicit params: Params) extends Table {
+class TroveHashMapOfTreeMap (implicit params: Params) extends Shard {
 
   private val table = new TIntObjectHashMap [TreeMap [Int, Int]] (params.naccounts)
-
-  private var clock = 0
-
-  private def raise (t: Int): Unit =
-    if (clock < t)
-      clock = t
-
-  def time = clock
 
   private def get (k: Int) = {
     var vs = table.get (k)
@@ -55,7 +47,8 @@ class TroveHashMapOfTreeMap (implicit params: Params) extends Table {
     vs.put (x, v)
   }
 
-  private def read (x: Int, k: Int): Value = {
+  def read (t: Int, k: Int): Value = {
+    val x = Int.MaxValue - t
     val vs = get (k)
     val i = vs.tailMap (x)
     if (i.isEmpty)
@@ -64,46 +57,25 @@ class TroveHashMapOfTreeMap (implicit params: Params) extends Table {
     return Value (v, Int.MaxValue - x2)
   }
 
-  def read (t: Int, ks: Int*): Seq [Value] = {
-    raise (t)
-    val x = Int.MaxValue - t
-    ks map (read (x, _))
-  }
-
-  private def prepare (r: Row): Int = {
-    val vs = get (r.k)
+  def prepare (k: Int): Int = {
+    val vs = get (k)
     if (vs.isEmpty)
-      return Int.MaxValue
-    return vs.firstKey
+      return 0
+    return Int.MaxValue - vs.firstKey
   }
 
-  private def prepare (t: Int, rs: Seq [Row]) {
-    val max = Int.MaxValue - (rs.map (prepare (_)) .min)
-    if (max > t) throw new StaleException (t, max)
-  }
+  def commit (t: Int, k: Int, v: Int): Unit =
+    put (k, v, Int.MaxValue - t)
 
-  private def commit (x: Int, r: Row): Unit =
-    put (r.k, r.v, x)
-
-  private def commit (rs: Seq [Row]): Int = {
-    clock += 1
-    val x = Int.MaxValue - clock
-    rs foreach (commit (x, _))
-    clock
-  }
-
-  def write (t: Int, rs: Row*): Int = {
-    raise (t)
-    prepare (t, rs)
-    commit (rs)
-  }
-
-  def scan(): Seq [Cell] = {
+  def scan (t: Int): Seq [Cell] = {
     val b = Seq.newBuilder [Cell]
     table.forEachEntry (new TIntObjectProcedure [TreeMap [Int, Int]] {
       def execute (k: Int, vs: TreeMap [Int, Int]): Boolean = {
-        for ((x, v) <- vs)
-          b += Cell (k, v, Int.MaxValue - x)
+        for {
+          (x, v) <- vs
+          t2 = Int.MaxValue - x
+          if t2 <= t
+        } b += Cell (k, v, t2)
         true
       }})
     b.result
@@ -116,5 +88,6 @@ trait NewTroveHashMapOfTreeMap extends NewTable {
 
   def parallel = false
 
-  def newTable (implicit params: Params) = new TroveHashMapOfTreeMap
+  def newTable (implicit params: Params): Table =
+    new TableFromShard (new TroveHashMapOfTreeMap)
 }

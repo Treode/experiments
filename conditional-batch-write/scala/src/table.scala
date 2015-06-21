@@ -99,7 +99,7 @@ trait NewTable {
   def newTable (implicit params: Params): Table
 
   def newRecommendedTable (implicit params: Params): Table =
-    new JavaHashMapOfTreeMap
+    new TableFromShard (new JavaHashMapOfTreeMap)
 
   def newRecommendedShard (implicit params: Params): Shard =
     new JavaHashMapOfTreeMap

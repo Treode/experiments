@@ -138,7 +138,7 @@ trait NewFiberizedTable extends NewAsyncTable {
   def newScheduler = Scheduler.newUsingCachedThreadPool
 
   def newTable (implicit params: Params, scheduler: Scheduler) =
-    new FiberizedTable (new JavaHashMapOfTreeMap)
+    new FiberizedTable (new TableFromShard (new JavaHashMapOfTreeMap))
 }
 
 trait NewFiberizedForkJoinTable extends NewAsyncTable {
@@ -146,7 +146,7 @@ trait NewFiberizedForkJoinTable extends NewAsyncTable {
   def newScheduler = Scheduler.newUsingForkJoinPool
 
   def newTable (implicit params: Params, scheduler: Scheduler) =
-    new FiberizedTable (new JavaHashMapOfTreeMap)
+    new FiberizedTable (new TableFromShard (new JavaHashMapOfTreeMap))
 }
 
 class AsyncLock (implicit scheduler: Scheduler) {
@@ -349,9 +349,9 @@ trait AsyncShard {
 
   def read (t: Int, k: Int) (cb: Value => Any)
 
-  def prepare (r: Row) (cb: Int => Any)
+  def prepare (k: Int) (cb: Int => Any)
 
-  def commit (t: Int, r: Row) (cb: Unit => Any)
+  def commit (t: Int, k: Int, v: Int) (cb: Unit => Any)
 
   def scan (t: Int) (cb: Seq [Cell] => Any)
 }
@@ -366,15 +366,15 @@ class FiberizedShard (shard: Shard) (implicit scheduler: Scheduler) extends Asyn
       cb (v)
     }
 
-  def prepare (r: Row) (cb: Int => Any): Unit =
+  def prepare (k: Int) (cb: Int => Any): Unit =
     fiber.execute {
-      val t = shard.prepare (r)
+      val t = shard.prepare (k)
       cb (t)
     }
 
-  def commit (t: Int, r: Row) (cb: Unit => Any): Unit =
+  def commit (t: Int, k: Int, v: Int) (cb: Unit => Any): Unit =
     fiber.execute {
-      shard.commit (t, r)
+      shard.commit (t, k, v)
       cb (())
     }
 
@@ -421,7 +421,7 @@ class AsyncShardedTable (
     }}
 
   private def prepare (r: Row) (cb: Int => Any): Unit =
-    shards (r.k & mask) .prepare (r) (cb)
+    shards (r.k & mask) .prepare (r.k) (cb)
 
   private def prepare (rs: Seq [Row]) (cb: Int => Any) {
     val i = rs.iterator
@@ -441,7 +441,7 @@ class AsyncShardedTable (
   }
 
   private def commit (t: Int, r: Row) (cb: Unit => Any): Unit =
-    shards (r.k & mask) .commit (t, r) (cb)
+    shards (r.k & mask) .commit (t, r.k, r.v) (cb)
 
   private def commit (t: Int, rs: Seq [Row]) (cb: Unit => Any): Unit = {
     val i = rs.iterator

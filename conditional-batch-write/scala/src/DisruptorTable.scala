@@ -182,16 +182,16 @@ class DisruptorShard (number: Int, mask: Int, shard: Shard) extends EventHandler
       case PREPARE =>
         val n = event.n
         if (n > 0 && (event.k1 & mask) == number)
-          event.t1 = shard.prepare (Row (event.k1, 0))
+          event.t1 = shard.prepare (event.k1)
         if (n > 1 && (event.k2 & mask) == number)
-          event.t2 = shard.prepare (Row (event.k2, 0))
+          event.t2 = shard.prepare (event.k2)
       case COMMIT =>
         val n = event.n
         val t = event.t
         if (n > 0 && (event.k1 & mask) == number)
-          shard.commit (t, Row (event.k1, event.v1))
+          shard.commit (t, event.k1, event.v1)
         if (n > 1 && (event.k2 & mask) == number)
-          shard.commit (t, Row (event.k2, event.v2))
+          shard.commit (t, event.k2, event.v2)
       case SCAN =>
         event.cs (number) = shard.scan (event.t)
       case _ => ()

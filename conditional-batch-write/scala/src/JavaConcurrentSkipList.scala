@@ -81,7 +81,7 @@ class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
     lock.scan (now)
     for {
       (Key (k, t), v) <- table.toSeq
-      if t < now
+      if t <= now
     } yield Cell (k, v, t)
   }
 

@@ -23,19 +23,11 @@ import scala.collection.JavaConversions._
   * order, so searching for `(k, Int.MaxValue)` will find the most recent value for the key. This
   * is not thread safe.
   */
-class JavaTreeMap extends Table {
+class JavaTreeMap extends Shard {
 
   private var table = new TreeMap [Key, Int]
 
-  private var clock = 0
-
-  private def raise (t: Int): Unit =
-    if (clock < t)
-      clock = t
-
-  def time = clock
-
-  private def read (t: Int, k: Int): Value = {
+  def read (t: Int, k: Int): Value = {
     val i = table.tailMap (Key (k, t))
     if (i.isEmpty)
       return Value.empty
@@ -45,43 +37,24 @@ class JavaTreeMap extends Table {
     return Value (v, t2)
   }
 
-  def read (t: Int, ks: Int*): Seq [Value] = {
-    raise (t)
-    ks map (read (t, _))
-  }
-
-  private def prepare (r: Row): Int = {
-    val i = table.tailMap (Key (r.k, Int.MaxValue))
+  def prepare (k: Int): Int = {
+    val i = table.tailMap (Key (k, Int.MaxValue))
     if (i.isEmpty)
       return 0
-    val (Key (k, t), _) = i.head
-    if (k != r.k)
+    val (Key (k2, t), _) = i.head
+    if (k2 != k)
       return 0
     return t
   }
 
-  private def prepare (t: Int, rs: Seq [Row]) {
-    val max = rs.map (prepare (_)) .max
-    if (max > t) throw new StaleException (t, max)
-  }
+  def commit (t: Int, k: Int, v: Int): Unit =
+    table += Key (k, t) -> v
 
-  private def commit (t: Int, r: Row): Unit =
-    table += Key (r.k, t) -> r.v
-
-  private def commit (rs: Seq [Row]): Int = {
-    clock += 1
-    rs foreach (commit (clock, _))
-    clock
-  }
-
-  def write (t: Int, rs: Row*): Int = {
-    raise (t)
-    prepare (t, rs)
-    commit (rs)
-  }
-
-  def scan(): Seq [Cell] =
-    for ((Key (k, t), v) <- table.toSeq) yield Cell (k, v, t)
+  def scan (t: Int): Seq [Cell] =
+    for {
+      (Key (k, t2), v) <- table.toSeq
+      if t2 <= t
+    } yield Cell (k, v, t2)
 
   def close() = ()
 }
@@ -90,5 +63,6 @@ trait NewJavaTreeMap extends NewTable {
 
   def parallel = false
 
-  def newTable (implicit params: Params) = new JavaTreeMap
+  def newTable (implicit params: Params): Table =
+    new TableFromShard (new JavaTreeMap)
 }

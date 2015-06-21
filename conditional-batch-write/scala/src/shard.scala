@@ -30,11 +30,11 @@ trait Shard {
   /** Read key `k` as of time `t`. */
   def read (t: Int, k: Int): Value
 
-  /** Find the latest timestamp for key `r.k`. */
-  def prepare (r: Row): Int
+  /** Find the latest timestamp for key `k`. */
+  def prepare (k: Int): Int
 
-  /** Write row `r` as of time `t`. */
-  def commit (t: Int, r: Row)
+  /** Set key `k` to value `v` at time `t`. */
+  def commit (t: Int, k: Int, v: Int)
 
   /** Scan the history before and including time `t`. Not part of the performance timings. */
   def scan (t: Int): Seq [Cell]
@@ -48,11 +48,11 @@ class SynchronizedShard (shard: Shard) extends Shard {
   def read (t: Int, k: Int): Value =
     synchronized (shard.read (t, k))
 
-  def prepare (r: Row): Int =
-    synchronized (shard.prepare (r))
+  def prepare (k: Int): Int =
+    synchronized (shard.prepare (k))
 
-  def commit (t: Int, r: Row): Unit =
-    synchronized (shard.commit (t, r))
+  def commit (t: Int, k: Int, v: Int): Unit =
+    synchronized (shard.commit (t, k, v))
 
   def scan (t: Int): Seq [Cell] =
     synchronized (shard.scan (t: Int))
@@ -71,15 +71,15 @@ class ReadWriteShard (shard: Shard) extends Shard {
     finally (lock.readLock.unlock())
   }
 
-  def prepare (r: Row): Int = {
+  def prepare (k: Int): Int = {
     lock.readLock.lock()
-    try (shard.prepare (r))
+    try (shard.prepare (k))
     finally (lock.readLock.unlock())
   }
 
-  def commit (t: Int, r: Row): Unit = {
+  def commit (t: Int, k: Int, v: Int): Unit = {
     lock.writeLock.lock()
-    try (shard.commit (t, r))
+    try (shard.commit (t, k, v))
     finally (lock.writeLock.unlock())
   }
 
@@ -98,17 +98,62 @@ class SingleThreadShard (shard: Shard, scheduler: SingleThreadScheduler) extends
   def read (t: Int, k: Int): Value =
     scheduler.submit (shard.read (t, k)) .safeGet
 
-  def prepare (r: Row): Int =
-    scheduler.submit (shard.prepare (r)) .safeGet
+  def prepare (k: Int): Int =
+    scheduler.submit (shard.prepare (k)) .safeGet
 
-  def commit (t: Int, r: Row): Unit =
-    scheduler.execute (shard.commit (t, r))
+  def commit (t: Int, k: Int, v: Int): Unit =
+    scheduler.execute (shard.commit (t, k, v))
 
   def scan (t: Int): Seq [Cell] =
     scheduler.submit (shard.scan (t: Int)) .safeGet
 
   def close(): Unit =
     scheduler.shutdown()
+}
+
+/** Convert a shard to a thread-unsafe table. */
+class TableFromShard (shard: Shard) extends Table {
+
+  private var clock = 0
+
+  private def raise (t: Int): Unit =
+    if (clock < t)
+      clock = t
+
+  def time = clock
+
+  def read (t: Int, ks: Int*): Seq [Value] = {
+    raise (t)
+    ks map (shard.read (t, _))
+  }
+
+  private def prepare (r: Row): Int =
+    shard.prepare (r.k)
+
+  private def prepare (t: Int, rs: Seq [Row]) {
+    val max = rs.map (prepare (_)) .max
+    if (max > t) throw new StaleException (t, max)
+  }
+
+  private def commit (t: Int, r: Row): Unit =
+    shard.commit (t, r.k, r.v)
+
+  private def commit (rs: Seq [Row]): Int = {
+    clock += 1
+    rs foreach (commit (clock, _))
+    clock
+  }
+
+  def write (t: Int, rs: Row*): Int = {
+    raise (t)
+    prepare (t, rs)
+    commit (rs)
+  }
+
+  def scan(): Seq [Cell] =
+    shard.scan (clock)
+
+  def close() = shard.close()
 }
 
 /** Shard the key space over many tables. */
@@ -127,7 +172,7 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
   }
 
   private def prepare (r: Row): Int =
-    shards (r.k & mask) .prepare (r)
+    shards (r.k & mask) .prepare (r.k)
 
   private def prepare (t: Int, rs: Seq [Row]) {
     val max = rs.map (prepare (_)) .max
@@ -135,7 +180,7 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
   }
 
   private def commit (t: Int, r: Row): Unit =
-    shards (r.k & mask) .commit (t, r)
+    shards (r.k & mask) .commit (t, r.k, r.v)
 
   private def commit (t: Int, rs: Seq [Row]): Unit =
     rs foreach (commit (t, _))
@@ -206,11 +251,11 @@ class FutureShard (shard: Shard, scheduler: SingleThreadScheduler) {
   def read (t: Int, k: Int): Future [Value] =
     scheduler.submit (shard.read (t, k))
 
-  def prepare (r: Row): Future [Int] =
-    scheduler.submit (shard.prepare (r))
+  def prepare (k: Int): Future [Int] =
+    scheduler.submit (shard.prepare (k))
 
-  def commit (t: Int, r: Row): Unit =
-    scheduler.execute (shard.commit (t, r))
+  def commit (t: Int, k: Int, v: Int): Unit =
+    scheduler.execute (shard.commit (t, k, v))
 
   def scan (t: Int): Future [Seq [Cell]] =
     scheduler.submit (shard.scan (t: Int))
@@ -235,7 +280,7 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
   }
 
   private def prepare (r: Row): Future [Int] =
-    shards (r.k & mask) .prepare (r)
+    shards (r.k & mask) .prepare (r.k)
 
   private def prepare (t: Int, rs: Seq [Row]) {
     val max = rs.map (prepare (_)) .map (_.get) .max
@@ -243,7 +288,7 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
   }
 
   private def commit (t: Int, r: Row): Unit =
-    shards (r.k & mask) .commit (t, r)
+    shards (r.k & mask) .commit (t, r.k, r.v)
 
   private def commit (t: Int, rs: Seq [Row]): Unit =
     rs foreach (commit (t, _))
@@ -307,11 +352,11 @@ class CollectorShard (shard: Shard, scheduler: SingleThreadScheduler) {
   def read (t: Int, k: Int, i: Int, c: Collector [Value]): Unit =
     scheduler.execute (c.set (i, shard.read (t, k)))
 
-  def prepare (r: Row, i: Int, c: Collector [Int]): Unit =
-    scheduler.execute (c.set (i, shard.prepare (r)))
+  def prepare (k: Int, i: Int, c: Collector [Int]): Unit =
+    scheduler.execute (c.set (i, shard.prepare (k)))
 
-  def commit (t: Int, r: Row): Unit =
-    scheduler.execute (shard.commit (t, r))
+  def commit (t: Int, k: Int, v: Int): Unit =
+    scheduler.execute (shard.commit (t, k, v))
 
   def scan (t: Int, i: Int, c: Collector [Seq [Cell]]): Unit =
     scheduler.submit (c.set (i, shard.scan (t: Int)))
@@ -338,14 +383,14 @@ class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => C
   private def prepare (t: Int, rs: Seq [Row]) {
     val c = new Collector [Int] (rs.size)
     for ((r, i) <- rs.zipWithIndex)
-      shards (r.k & mask) .prepare (r, i, c)
+      shards (r.k & mask) .prepare (r.k, i, c)
     val max = c.result.max
     if (max > t) throw new StaleException (t, max)
   }
 
   private def commit (t: Int, rs: Seq [Row]): Unit =
     for (r <- rs)
-      shards (r.k & mask) .commit (t, r)
+      shards (r.k & mask) .commit (t, r.k, r.v)
 
   def write (t: Int, rs: Row*): Int = {
     val wt = lock.write (lock.time, rs) + 1
