@@ -23,19 +23,20 @@
 #include <mutex>
 
 #include "table.hpp"
+#include "tbb/spin_mutex.h"
 #include "tbb/task.h"
 
 class Fiber {
 
   public:
 
-    Fiber(): engaged(false) {}
+    virtual ~Fiber() = default;
 
     template <typename F>
     tbb::task *enqueue(tbb::task *current, F f);
 
     tbb::task *dequeue(tbb::task *current) {
-      auto t = dequeue();
+      auto t = _dequeue();
       if (t != nullptr)
         current->spawn(*t);
       return nullptr;
@@ -43,32 +44,9 @@ class Fiber {
 
   private:
 
-    tbb::task *enqueue(tbb::task *t) {
-      std::lock_guard<std::mutex> acqn(lock);
-      if (!engaged) {
-        engaged = true;
-        return t;
-      } else {
-        tasks.push_back(t);
-        return nullptr;
-      }
-    }
+    virtual tbb::task *_enqueue(tbb::task *task) =  0;
 
-    tbb::task *dequeue() {
-      std::lock_guard<std::mutex> acqn(lock);
-      if (tasks.empty()) {
-        engaged = false;
-        return nullptr;
-      } else {
-        auto t = tasks.front();
-        tasks.pop_front();
-        return t;
-      }
-    }
-
-    std::mutex lock;
-    std::deque<tbb::task*> tasks;
-    bool engaged;
+    virtual tbb::task *_dequeue() = 0;
 };
 
 template <typename F>
@@ -91,8 +69,80 @@ class FiberTask: public tbb::task {
 
 template <typename F>
 tbb::task *Fiber::enqueue(tbb::task *current, F f) {
-  return enqueue(new(current->allocate_child()) FiberTask<F>(*this, f));
+  return _enqueue(new(current->allocate_child()) FiberTask<F>(*this, f));
 }
+
+class StdFiber: public Fiber {
+
+  public:
+
+    StdFiber(): engaged(false) {}
+
+  private:
+
+    tbb::task *_enqueue(tbb::task *t) {
+      std::unique_lock<std::mutex> acqn(lock);
+      if (!engaged) {
+        engaged = true;
+        return t;
+      } else {
+        tasks.push_back(t);
+        return nullptr;
+      }
+    }
+
+    tbb::task *_dequeue() {
+      std::unique_lock<std::mutex> acqn(lock);
+      if (tasks.empty()) {
+        engaged = false;
+        return nullptr;
+      } else {
+        auto t = tasks.front();
+        tasks.pop_front();
+        return t;
+      }
+    }
+
+    std::mutex lock;
+    std::deque<tbb::task*> tasks;
+    bool engaged;
+};
+
+class TbbFiber: public Fiber {
+
+  public:
+
+    TbbFiber(): engaged(false) {}
+
+  private:
+
+    tbb::task *_enqueue(tbb::task *t) {
+      tbb::spin_mutex::scoped_lock acqn(lock);
+      if (!engaged) {
+        engaged = true;
+        return t;
+      } else {
+        tasks.push_back(t);
+        return nullptr;
+      }
+    }
+
+    tbb::task *_dequeue() {
+      tbb::spin_mutex::scoped_lock acqn(lock);
+      if (tasks.empty()) {
+        engaged = false;
+        return nullptr;
+      } else {
+        auto t = tasks.front();
+        tasks.pop_front();
+        return t;
+      }
+    }
+
+    tbb::spin_mutex lock;
+    std::deque<tbb::task*> tasks;
+    bool engaged;
+};
 
 class AsyncTable {
 
@@ -105,8 +155,8 @@ class AsyncTable {
     virtual tbb::task *write(uint32_t t, size_t n, const Row *rs, tbb::task *current) = 0;
 };
 
-// T is a Table
-template <typename T>
+// T is a Table, F is a Fiber
+template <typename T, typename F>
 class FiberizedTable: public AsyncTable {
 
   public:
@@ -134,7 +184,7 @@ class FiberizedTable: public AsyncTable {
   private:
 
     T table;
-    Fiber fiber;
+    F fiber;
 };
 
 std::chrono::high_resolution_clock::duration

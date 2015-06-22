@@ -151,8 +151,8 @@ void perf(
 ) {
 
   unsigned nhits = 5;
-  unsigned ntrials = 2000;
-  unsigned nclocks = 60 * CLOCKS_PER_SEC;
+  unsigned ntrials = 40;
+  unsigned nclocks = 15 * CLOCKS_PER_SEC;
   double tolerance = 0.01;
   double ops = params.ntransfers;
 
@@ -210,9 +210,15 @@ int main() {
 
     Params params(platform, nlocks, nlocks, naccounts, nbrokers, ntransfers);
 
+    /* Hangs!
     perf<AsyncTable>([] {
-      return new FiberizedTable<TableFromShard<CppUnorderedMapOfMap>>();
-    }, async_brokers, "FiberizedTable", params, results);
+      return new FiberizedTable<TableFromShard<CppUnorderedMapOfMap>, StdFiber>();
+    }, async_brokers, "StdFiberizedTable", params, results);
+    */
+
+    perf<AsyncTable>([] {
+      return new FiberizedTable<TableFromShard<CppUnorderedMapOfMap>, TbbFiber>();
+    }, async_brokers, "TbbFiberizedTable", params, results);
 
     perf<Table>([=, &params] {
       return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(params);
