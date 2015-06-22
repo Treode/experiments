@@ -158,6 +158,9 @@ class JCToolsQueuePerf (implicit p: Params)
 class JavaArrayListPerf (implicit p: Params)
   extends SyncTablePerf with NewJavaArrayList
 
+class CasListPerf (implicit p: Params)
+  extends SyncTablePerf with NewCasList
+
 class JavaConcurrentSkipListMapPerf (implicit p: Params)
   extends SyncTablePerf with NewJavaConcurrentSkipListMap
 
@@ -254,6 +257,7 @@ object Main {
 
       results += (new JavaConcurrentSkipListMapPerf).perf()
       results += (new JavaArrayListPerf).perf()
+      results += (new CasListPerf).perf()
 
       results += (new FiberizedTablePerf).perf()
       results += (new FiberizedForkJoinTablePerf).perf()

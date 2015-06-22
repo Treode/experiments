@@ -145,6 +145,8 @@ class JCToolsQueueSpec extends TableBehaviors with NewJCToolsQueueTable
 
 class JavaArrayListSpec extends TableBehaviors with NewJavaArrayList
 
+class CasListSpec extends TableBehaviors with NewCasList
+
 class JavaConcurrentSkipListMapSpec extends TableBehaviors with NewJavaConcurrentSkipListMap
 
 class SynchronizedTableSpec extends TableBehaviors with NewSynchronizedTable
