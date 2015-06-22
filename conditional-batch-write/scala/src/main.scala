@@ -16,7 +16,7 @@
 
 package experiments
 
-import java.lang.Integer.{bitCount, highestOneBit}
+import java.lang.Integer.{bitCount, decode, highestOneBit}
 import java.lang.Runtime.getRuntime
 import scala.collection.mutable.Builder
 
@@ -218,14 +218,44 @@ object Main {
 
   def main (args: Array [String]) {
 
+    var platform = "unknown"
+    var nreads = 2
+    var all = false
+
+    var argi = 0
+    while (argi < args.length) {
+      args (argi) match {
+
+        // Run all tests; default skips slow implementations.
+        case "-a" =>
+          all = true
+
+        // Platform ID in result lists.
+        case "-p" =>
+          argi += 1
+          require (argi < args.length, "-p requires a value")
+          platform = args (argi)
+
+        // Number of random reads per transfer.
+        case "-r" =>
+          argi += 1
+          require (argi < args.length, "-r requires a value")
+          nreads = decode (args (argi))
+
+        case _ =>
+          assert (false, "Usage: perf [-a] [-p platform] [-r nreads]")
+      }
+      argi += 1
+    }
+
     val defaults = Params (
-      platform = if (args.length > 0) args (0) else "unknown",
+      platform = platform,
       nlocks = 1 << 12,
       nshards = 1,
       naccounts = 1 << 12,
       nbrokers = 1,
       ntransfers = 1 << 14,
-      nreads = 2)
+      nreads = nreads)
 
     val results = new PerfResults
 
@@ -237,12 +267,14 @@ object Main {
       implicit val params = defaults
 
       results += (new JavaHashMapOfTreeMapPerf).perf()
-      results += (new JavaTreeMapPerf).perf()
-      results += (new ScalaMapOfSortedMapPerf).perf()
-      results += (new ScalaMutableMapOfSortedMapPerf).perf()
-      results += (new ScalaSortedMapPerf).perf()
-      results += (new TroveHashMapOfTreeMapPerf).perf()
-    }
+
+      if (all) {
+        results += (new JavaTreeMapPerf).perf()
+        results += (new ScalaMapOfSortedMapPerf).perf()
+        results += (new ScalaMutableMapOfSortedMapPerf).perf()
+        results += (new ScalaSortedMapPerf).perf()
+        results += (new TroveHashMapOfTreeMapPerf).perf()
+      }}
 
     //
     // nshards = 1 (not relevant)
@@ -251,17 +283,23 @@ object Main {
     for (nbrokers <- brokers) {
       implicit val params = defaults.copy (nshards = defaults.nlocks, nbrokers = nbrokers)
 
-      results += (new SingleThreadExecutorPerf).perf()
-      results += (new SimpleQueuePerf).perf()
-      results += (new JCToolsQueuePerf).perf()
+      // Test this one with many shards; also tested below.
+      results += (new SynchronizedShardedTablePerf).perf()
 
-      results += (new JavaConcurrentSkipListMapPerf).perf()
+      // These are designed to be used with many shards only.
       results += (new JavaArrayListPerf).perf()
       results += (new CasListPerf).perf()
 
-      results += (new FiberizedTablePerf).perf()
-      results += (new FiberizedForkJoinTablePerf).perf()
-    }
+      if (all) {
+        results += (new SingleThreadExecutorPerf).perf()
+        results += (new SimpleQueuePerf).perf()
+        results += (new JCToolsQueuePerf).perf()
+
+        results += (new JavaConcurrentSkipListMapPerf).perf()
+
+        results += (new FiberizedTablePerf).perf()
+        results += (new FiberizedForkJoinTablePerf).perf()
+      }}
 
     //
     // nshards and nbrokers vary
@@ -270,21 +308,24 @@ object Main {
     for (nshards <- shards; nbrokers <- brokers) {
       implicit val params = defaults.copy (nshards = nshards, nbrokers = nbrokers)
 
-      results += (new ShardedQueuePerf).perf()
-
-      results += (new SynchronizedTablePerf).perf()
+      // Test this one with a "reasonable" number of shards; also tested above.
       results += (new SynchronizedShardedTablePerf).perf()
-      results += (new ReadWriteShardedTablePerf).perf()
-      results += (new SingleThreadShardedTablePerf).perf()
-      results += (new FutureShardedTablePerf).perf()
-      results += (new CollectorShardedTablePerf).perf()
-      results += (new DisruptorTablePerf).perf()
 
-      results += (new FiberizedShardedTablePerf).perf()
-      results += (new FiberizedShardedForkJoinTablePerf).perf()
+      if (all) {
+        results += (new ShardedQueuePerf).perf()
 
-      results += (new ConditionLockPerf).perf()
-    }
+        results += (new SynchronizedTablePerf).perf()
+        results += (new ReadWriteShardedTablePerf).perf()
+        results += (new SingleThreadShardedTablePerf).perf()
+        results += (new FutureShardedTablePerf).perf()
+        results += (new CollectorShardedTablePerf).perf()
+        results += (new DisruptorTablePerf).perf()
+
+        results += (new FiberizedShardedTablePerf).perf()
+        results += (new FiberizedShardedForkJoinTablePerf).perf()
+
+        results += (new ConditionLockPerf).perf()
+      }}
 
     println ("--")
     println (results)
