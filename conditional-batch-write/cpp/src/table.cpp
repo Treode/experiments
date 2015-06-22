@@ -77,7 +77,7 @@ unsigned fib(unsigned n) {
 unsigned broker(Table &table, const Params &params) {
 
   std::default_random_engine reng;
-  std::uniform_int_distribution<int> racct(0, 100);
+  std::uniform_int_distribution<int> racct(0, params.naccounts);
   std::uniform_int_distribution<int> ramt(0, 1000);
   unsigned sum = 0;
 

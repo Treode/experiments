@@ -220,11 +220,11 @@ object Main {
 
     val defaults = Params (
       platform = if (args.length > 0) args (0) else "unknown",
-      nlocks = 128,
+      nlocks = 1 << 12,
       nshards = 1,
-      naccounts = 100,
+      naccounts = 1 << 12,
       nbrokers = 1,
-      ntransfers = 6400)
+      ntransfers = 1 << 14)
 
     val results = new PerfResults
 
@@ -252,7 +252,6 @@ object Main {
 
       results += (new SingleThreadExecutorPerf).perf()
       results += (new SimpleQueuePerf).perf()
-      results += (new ShardedQueuePerf).perf()
       results += (new JCToolsQueuePerf).perf()
 
       results += (new JavaConcurrentSkipListMapPerf).perf()
@@ -269,6 +268,8 @@ object Main {
 
     for (nshards <- shards; nbrokers <- brokers) {
       implicit val params = defaults.copy (nshards = nshards, nbrokers = nbrokers)
+
+      results += (new ShardedQueuePerf).perf()
 
       results += (new SynchronizedTablePerf).perf()
       results += (new SynchronizedShardedTablePerf).perf()
