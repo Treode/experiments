@@ -204,11 +204,23 @@ trait TableTools {
     try (f (table)) finally (table.close())
   }
 
-  /** Transfer money from one account to another `ntransfers` times in this thread. */
-  def broker (table: Table) (implicit params: Params) {
-    import params.{naccounts, nbrokers, ntransfers}
+  /** Transfer money from one account to another `ntransfers` times in this thread; also perform
+    * `nreads` random reads to simulate different read/write mixes.
+    */
+  def broker (table: Table) (implicit params: Params): Int = {
+    import params.{naccounts, nbrokers, nreads, ntransfers}
     val random = new Random
     var nstale = 0
+    var sum = 0
+
+    def read() {
+      val a = random.nextInt (naccounts)
+      val rt = table.time
+      for (_ <- 0 until nreads) {
+        // Add to sum to ensure compiler doesn't optimize this away.
+        val Seq (v) = table.read (rt, a)
+        sum += v.v
+      }}
 
     def transfer () {
       // Two accounts and an amount to transfer from a1 to a2
@@ -230,6 +242,9 @@ trait TableTools {
     for (_ <- 0 until count)
       transfer()
     assert (nstale < count)
+
+    // Return sum to ensure compiler doesn't optimize it away.
+    sum
   }
 
   /** Transfer money from one account to another `ntransfers` times in a new thread. */

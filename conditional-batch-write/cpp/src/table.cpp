@@ -29,7 +29,8 @@ std::ostream &operator<<(std::ostream &os, const Params p) {
      << ", nshards: " << p.nshards
      << ", naccounts: " << p.naccounts
      << ", nbrokers: " << p.nbrokers
-     << ", ntransfers: " << p.ntransfers;
+     << ", ntransfers: " << p.ntransfers
+     << ", nreads: " << p.nreads;
   return os;
 }
 
@@ -83,27 +84,48 @@ unsigned broker(Table &table, const Params &params) {
 
   auto count = params.ntransfers / params.nbrokers;
   for (unsigned i = 0; i < count; ++i) {
-    int a1 = racct(reng);
-    int a2;
-    while ((a2 = racct (reng)) == a1);
-    auto n = ramt(reng);
 
-    //sum += fib(10); // read request from network
-    auto rt = table.time();
-    int ks[] = {a1, a2};
-    Value vs[2];
-    table.read(rt, 2, ks, vs);
-
-    //sum += fib(10); // processing
-    try {
-      Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
-      table.write(rt, 2, rs);
-    } catch (stale_exception e) {
-      // ignored
+    { // Random reads.
+      for (unsigned j = 0; j < params.nreads; ++j) {
+        int a = racct(reng);
+        auto rt = table.time();
+        int ks[] = {a};
+        Value vs[1];
+        table.read(rt, 1, ks, vs);
+        // Add to sum to ensure compiler doesn't optimize this away.
+        sum += vs[0].v;
+      }
     }
 
-    //sum += fib(10); // write response to network
+    { // Transfer.
+      int a1 = racct(reng);
+      int a2;
+      while ((a2 = racct (reng)) == a1);
+      auto n = ramt(reng);
+
+      // Read request from network.
+      //sum += fib(10);
+
+      auto rt = table.time();
+      int ks[] = {a1, a2};
+      Value vs[2];
+      table.read(rt, 2, ks, vs);
+
+      // Processing.
+      //sum += fib(10);
+
+      try {
+        Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
+        table.write(rt, 2, rs);
+      } catch (stale_exception e) {
+        // ignored
+      }
+    }
+
+    // Write response to network.
+    //sum += fib(10);
   }
 
+  // Return sum to ensure compiler doesn't optimize it away.
   return sum;
 }

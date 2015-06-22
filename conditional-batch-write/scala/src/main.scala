@@ -224,7 +224,8 @@ object Main {
       nshards = 1,
       naccounts = 1 << 12,
       nbrokers = 1,
-      ntransfers = 1 << 14)
+      ntransfers = 1 << 14,
+      nreads = 2)
 
     val results = new PerfResults
 

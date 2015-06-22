@@ -185,6 +185,7 @@ int main() {
   size_t nlocks = 1<<12;
   size_t naccounts = 1<<12;
   size_t ntransfers = 1<<14;
+  size_t nreads = 2;
 
   // Powers of 2, from 1 to availableProcessors (or next power of 2).
   vector<unsigned> shards;
@@ -199,7 +200,7 @@ int main() {
   vector<PerfResult> results;
 
   {
-    Params params(platform, nlocks, 1, naccounts, 1, ntransfers);
+    Params params(platform, nlocks, 1, naccounts, 1, ntransfers, nreads);
 
     perf<Table>([] {
       return new TableFromShard<CppUnorderedMapOfMap>();
@@ -208,7 +209,7 @@ int main() {
 
   for (auto nbrokers: brokers) {
 
-    Params params(platform, nlocks, nlocks, naccounts, nbrokers, ntransfers);
+    Params params(platform, nlocks, nlocks, naccounts, nbrokers, ntransfers, nreads);
 
     /* Hangs!
     perf<AsyncTable>([] {
@@ -232,7 +233,7 @@ int main() {
   for (auto nshards: shards) {
     for (auto nbrokers: brokers) {
 
-      Params params(platform, nlocks, nshards, naccounts, nbrokers, ntransfers);
+      Params params(platform, nlocks, nshards, naccounts, nbrokers, ntransfers, nreads);
 
       perf<Table>([=, &params] {
         return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);

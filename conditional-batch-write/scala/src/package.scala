@@ -19,7 +19,15 @@ import java.util.concurrent.{ExecutionException, Future}
 
 package object experiments {
 
-  case class Params (platform: String, nlocks: Int, nshards: Int, naccounts: Int, nbrokers: Int, ntransfers: Int) {
+  case class Params (
+    platform: String,
+    nlocks: Int,
+    nshards: Int,
+    naccounts: Int,
+    nbrokers: Int,
+    ntransfers: Int,
+    nreads: Int
+  ) {
 
     override def toString =
       s"platform: $platform, " +
@@ -27,7 +35,8 @@ package object experiments {
       s"nshards: $nshards, " +
       s"naccounts: $naccounts, " +
       s"nbrokers: $nbrokers, " +
-      s"ntransfers: $ntransfers"
+      s"ntransfers: $ntransfers, " +
+      s"nreads: $nreads"
   }
 
   implicit class RichFuture [A] (f: Future [A]) {

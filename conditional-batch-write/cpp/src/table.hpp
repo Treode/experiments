@@ -33,6 +33,7 @@ struct Params {
   size_t naccounts;
   size_t nbrokers;
   size_t ntransfers;
+  size_t nreads;
 
   Params(
     const std::string &_platform,
@@ -40,14 +41,16 @@ struct Params {
     size_t _nshards,
     size_t _naccounts,
     size_t _nbrokers,
-    size_t _ntransfers
+    size_t _ntransfers,
+    size_t _nreads
   ):
     platform(_platform),
     nlocks(_nlocks),
     nshards(_nshards),
     naccounts(_naccounts),
     nbrokers(_nbrokers),
-    ntransfers(_ntransfers)
+    ntransfers(_ntransfers),
+    nreads(_nreads)
   {}
 };
 

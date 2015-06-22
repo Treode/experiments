@@ -59,7 +59,7 @@ void expectMoneyConserved(const Table &table) {
 
 void table_behaviors(const function<Table*(Params &)> &new_table, bool parallel) {
 
-  Params params("unknown", 8, 8, 100, 8, 3200);
+  Params params("unknown", 8, 8, 100, 8, 3200, 2);
 
   SECTION("A table should read 0 for any key", "[table]") {
     unique_ptr<Table> table (new_table(params));

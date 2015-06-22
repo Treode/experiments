@@ -15,7 +15,8 @@ trait TableBehaviors extends FlatSpec with TableTools {
     nshards = 8,
     naccounts = 100,
     nbrokers = 8,
-    ntransfers = 3200)
+    ntransfers = 3200,
+    nreads = 2)
 
   def assertSeq [A] (expected: A*) (actual: Seq [A]): Unit =
     assertResult (expected) (actual)
@@ -81,7 +82,8 @@ trait AsyncTableBehaviors extends FlatSpec with AsyncTableTools {
     nshards = 8,
     naccounts = 100,
     nbrokers = 8,
-    ntransfers = 1000)
+    ntransfers = 1000,
+    nreads = 2)
 
   def assertSeq [A] (expected: A*) (actual: Seq [A]): Unit =
     assertResult (expected) (actual)
