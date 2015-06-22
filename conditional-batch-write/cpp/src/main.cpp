@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <iostream>
@@ -26,9 +27,11 @@
 #include "CppVector.hpp"
 #include "StdConditionLock.hpp"
 #include "TbbConditionLock.hpp"
+#include "async.hpp"
 #include "lock.hpp"
 #include "table.hpp"
 
+using std::atomic;
 using std::chrono::duration;
 using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
@@ -138,10 +141,11 @@ parallel_brokers(const function<Table*(void)> &new_table, const Params &params) 
   return end - start;
 }
 
+template<typename T>
 void perf(
-  const function<Table*(void)> &new_table,
+  const function<T*(void)> &new_table,
+  high_resolution_clock::duration (*brokers)(const function<T*()> &, const Params &),
   const string &name,
-  bool parallel,
   const Params &params,
   vector<PerfResult> &results
 ) {
@@ -160,9 +164,7 @@ void perf(
   unsigned hits = 0;
   auto limit = clock() + nclocks;
   while (trial < ntrials && hits < nhits && clock() < limit) {
-    auto elapsed = parallel ?
-      parallel_brokers(new_table, params) :
-      serial_brokers(new_table, params);
+    auto elapsed = brokers(new_table, params);
     double x = ops * 1000.0 / (double)duration_cast<microseconds>(elapsed).count();
     sum += x;
     ++trial;
@@ -199,22 +201,26 @@ int main() {
   {
     Params params(platform, nlocks, 1, naccounts, 1, ntransfers);
 
-    perf([] {
+    perf<Table>([] {
       return new TableFromShard<CppUnorderedMapOfMap>();
-    }, "CppUnorderedMapOfMap", false, params, results);
+    }, serial_brokers, "CppUnorderedMapOfMap", params, results);
   }
 
   for (auto nbrokers: brokers) {
 
     Params params(platform, nlocks, nlocks, naccounts, nbrokers, ntransfers);
 
-    perf([=, &params] {
-      return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(params);
-    }, "CppVector", true, params, results);
+    perf<AsyncTable>([] {
+      return new FiberizedTable<TableFromShard<CppUnorderedMapOfMap>>();
+    }, async_brokers, "FiberizedTable", params, results);
 
-    perf([=, &params] {
+    perf<Table>([=, &params] {
+      return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(params);
+    }, parallel_brokers, "CppVector", params, results);
+
+    perf<Table>([=, &params] {
       return new ShardedTable<LockSpace<TbbConditionLock>, CppCasList>(params);
-    }, "CppCasList", true, params, results);
+    }, parallel_brokers, "CppCasList", params, results);
   }
 
   for (auto nshards: shards) {
@@ -222,21 +228,21 @@ int main() {
 
       Params params(platform, nlocks, nshards, naccounts, nbrokers, ntransfers);
 
-      perf([=, &params] {
+      perf<Table>([=, &params] {
         return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
-      }, "StdLockAndTable", true, params, results);
+      }, parallel_brokers, "StdLockAndTable", params, results);
 
-      perf([=, &params] {
+      perf<Table>([=, &params] {
         return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
-      }, "StdLockTbbTable", true, params, results);
+      }, parallel_brokers, "StdLockTbbTable", params, results);
 
-      perf([=, &params] {
+      perf<Table>([=, &params] {
         return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
-      }, "TbbLockStdTable", true, params, results);
+      }, parallel_brokers, "TbbLockStdTable", params, results);
 
-      perf([=, &params] {
+      perf<Table>([=, &params] {
         return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
-      }, "TbbLockAndTable", true, params, results);
+      }, parallel_brokers, "TbbLockAndTable", params, results);
     }
   }
 
