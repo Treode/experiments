@@ -213,59 +213,9 @@ object Main {
 
   val brokers = Seq (1, 2, 4, 8, 16, 32, 64)
 
-  // Cannot handle concurrent clients.
-  def unthreaded (results: PerfResults) (implicit params: Params) {
-    results += (new JavaHashMapOfTreeMapPerf).perf()
-    results += (new JavaTreeMapPerf).perf()
-    results += (new ScalaMapOfSortedMapPerf).perf()
-    results += (new ScalaMutableMapOfSortedMapPerf).perf()
-    results += (new ScalaSortedMapPerf).perf()
-    results += (new TroveHashMapOfTreeMapPerf).perf()
-  }
-
-  // Queue tasks onto a single thread.
-  def queues (results: PerfResults) (implicit params: Params) {
-    results += (new SingleThreadExecutorPerf).perf()
-    results += (new SimpleQueuePerf).perf()
-    results += (new ShardedQueuePerf).perf()
-    results += (new JCToolsQueuePerf).perf()
-  }
-
-  // Handle concurrency some other way.
-  def concurrent (results: PerfResults) (implicit params: Params) {
-    results += (new JavaConcurrentSkipListMapPerf).perf()
-    results += (new JavaArrayListPerf).perf() (params.copy (nshards = params.nlocks))
-  }
-
-  def concurrentSharded (results: PerfResults) (implicit params: Params) {
-    results += (new SynchronizedTablePerf).perf()
-    results += (new SynchronizedShardedTablePerf).perf()
-    results += (new ReadWriteShardedTablePerf).perf()
-    results += (new SingleThreadShardedTablePerf).perf()
-    results += (new FutureShardedTablePerf).perf()
-    results += (new CollectorShardedTablePerf).perf()
-    results += (new DisruptorTablePerf).perf()
-  }
-
-  // Asynchronous strategies.
-  def asynchronous (results: PerfResults) (implicit params: Params) {
-    results += (new FiberizedTablePerf).perf()
-    results += (new FiberizedForkJoinTablePerf).perf()
-  }
-
-  def asynchronousSharded (results: PerfResults) (implicit params: Params) {
-    results += (new FiberizedShardedTablePerf).perf()
-    results += (new FiberizedShardedForkJoinTablePerf).perf()
-  }
-
-  // Alternative strategies for the logical clock lock.
-  def locks (results: PerfResults) (implicit params: Params) {
-    results += (new ConditionLockPerf).perf()
-  }
-
   def main (args: Array [String]) {
 
-    val params = Params (
+    val defaults = Params (
       platform = if (args.length > 0) args (0) else "unknown",
       nlocks = 128,
       nshards = 1,
@@ -275,25 +225,60 @@ object Main {
 
     val results = new PerfResults
 
-    unthreaded (results) (params)
+    //
+    // nshards = 1 (not relevant), nbrokers = 1 (not parallel)
+    //
 
-    for (nbrokers <- brokers)
-      queues (results) (params.copy (nbrokers = nbrokers))
+    {
+      implicit val params = defaults
 
-    for (nshards <- shards)
-      for (nbrokers <- brokers)
-        locks (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
-
-    for (nbrokers <- brokers) {
-      concurrent (results) (params.copy (nbrokers = nbrokers))
-      asynchronous (results) (params.copy (nbrokers = nbrokers))
+      results += (new JavaHashMapOfTreeMapPerf).perf()
+      results += (new JavaTreeMapPerf).perf()
+      results += (new ScalaMapOfSortedMapPerf).perf()
+      results += (new ScalaMutableMapOfSortedMapPerf).perf()
+      results += (new ScalaSortedMapPerf).perf()
+      results += (new TroveHashMapOfTreeMapPerf).perf()
     }
 
-    for (nshards <- shards)
-      for (nbrokers <- brokers) {
-        concurrentSharded (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
-        asynchronousSharded (results) (params.copy (nshards = nshards, nbrokers = nbrokers))
-      }
+    //
+    // nshards = 1 (not relevant)
+    //
+
+    for (nbrokers <- brokers) {
+      implicit val params = defaults.copy (nshards = defaults.nlocks, nbrokers = nbrokers)
+
+      results += (new SingleThreadExecutorPerf).perf()
+      results += (new SimpleQueuePerf).perf()
+      results += (new ShardedQueuePerf).perf()
+      results += (new JCToolsQueuePerf).perf()
+
+      results += (new JavaConcurrentSkipListMapPerf).perf()
+      results += (new JavaArrayListPerf).perf()
+
+      results += (new FiberizedTablePerf).perf()
+      results += (new FiberizedForkJoinTablePerf).perf()
+    }
+
+    //
+    // nshards and nbrokers vary
+    //
+
+    for (nshards <- shards; nbrokers <- brokers) {
+      implicit val params = defaults.copy (nshards = nshards, nbrokers = nbrokers)
+
+      results += (new SynchronizedTablePerf).perf()
+      results += (new SynchronizedShardedTablePerf).perf()
+      results += (new ReadWriteShardedTablePerf).perf()
+      results += (new SingleThreadShardedTablePerf).perf()
+      results += (new FutureShardedTablePerf).perf()
+      results += (new CollectorShardedTablePerf).perf()
+      results += (new DisruptorTablePerf).perf()
+
+      results += (new FiberizedShardedTablePerf).perf()
+      results += (new FiberizedShardedForkJoinTablePerf).perf()
+
+      results += (new ConditionLockPerf).perf()
+    }
 
     println ("--")
     println (results)
