@@ -19,6 +19,7 @@
 #include <thread>
 #include <vector>
 
+#include "CppCasList.hpp"
 #include "CppUnorderedMapOfMap.hpp"
 #include "CppVector.hpp"
 #include "StdConditionLock.hpp"
@@ -118,7 +119,15 @@ TEST_CASE ("The CppVector should work", "[tables]") {
   table_behaviors([] (Params &params) {
     auto copy = params;
     copy.nshards = params.nlocks;
-    return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppVector>>(copy);
+    return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(copy);
+  }, true);
+}
+
+TEST_CASE ("The CppCasList should work", "[tables]") {
+  table_behaviors([] (Params &params) {
+    auto copy = params;
+    copy.nshards = params.nlocks;
+    return new ShardedTable<LockSpace<TbbConditionLock>, CppCasList>(copy);
   }, true);
 }
 

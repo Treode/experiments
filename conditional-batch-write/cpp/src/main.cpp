@@ -21,6 +21,7 @@
 #include <thread>
 #include <vector>
 
+#include "CppCasList.hpp"
 #include "CppUnorderedMapOfMap.hpp"
 #include "CppVector.hpp"
 #include "StdConditionLock.hpp"
@@ -202,13 +203,15 @@ int main() {
 
   for (auto nbrokers: brokers) {
 
-    Params params(platform, 128, 1, 100, nbrokers, 6400);
+    Params params(platform, 128, 128, 100, nbrokers, 6400);
 
     perf([=, &params] {
-      auto copy = params;
-      copy.nshards = params.nlocks;
-      return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(copy);
+      return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(params);
     }, "CppVector", true, params, results);
+
+    perf([=, &params] {
+      return new ShardedTable<LockSpace<TbbConditionLock>, CppCasList>(params);
+    }, "CppCasList", true, params, results);
   }
 
   for (auto nshards: shards) {
