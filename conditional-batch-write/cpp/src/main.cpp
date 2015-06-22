@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "CppUnorderedMapOfMap.hpp"
+#include "CppVector.hpp"
 #include "StdConditionLock.hpp"
 #include "TbbConditionLock.hpp"
 #include "lock.hpp"
@@ -197,6 +198,17 @@ int main() {
     perf([] {
       return new TableFromShard<CppUnorderedMapOfMap>();
     }, "CppUnorderedMapOfMap", false, params, results);
+  }
+
+  for (auto nbrokers: brokers) {
+
+    Params params(platform, 128, 1, 100, nbrokers, 6400);
+
+    perf([=, &params] {
+      auto copy = params;
+      copy.nshards = params.nlocks;
+      return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(copy);
+    }, "CppVector", true, params, results);
   }
 
   for (auto nshards: shards) {

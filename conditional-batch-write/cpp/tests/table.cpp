@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "CppUnorderedMapOfMap.hpp"
+#include "CppVector.hpp"
 #include "StdConditionLock.hpp"
 #include "TbbConditionLock.hpp"
 #include "catch.hpp"
@@ -111,6 +112,14 @@ TEST_CASE ("The CppUnorderedMapOfMap should work", "[tables]") {
   table_behaviors([] (Params &params) {
     return new TableFromShard<CppUnorderedMapOfMap>();
   }, false);
+}
+
+TEST_CASE ("The CppVector should work", "[tables]") {
+  table_behaviors([] (Params &params) {
+    auto copy = params;
+    copy.nshards = params.nlocks;
+    return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppVector>>(copy);
+  }, true);
 }
 
 TEST_CASE ("The StdLockAndTable should work", "[tables]") {
