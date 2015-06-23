@@ -26,8 +26,6 @@
 #include "CppCasList.hpp"
 #include "CppUnorderedMapOfMap.hpp"
 #include "CppVector.hpp"
-#include "StdConditionLock.hpp"
-#include "TbbConditionLock.hpp"
 #include "async.hpp"
 #include "lock.hpp"
 #include "table.hpp"
@@ -249,11 +247,11 @@ int main(int argc, char **argv) {
     //
 
     perf<Table>([=, &params] {
-      return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(params);
+      return new ShardedTable<LockSpace<TbbLock>, TbbMutexShard<CppVector>>(params);
     }, parallel_brokers, "CppVector", params, results);
 
     perf<Table>([=, &params] {
-      return new ShardedTable<LockSpace<TbbConditionLock>, CppCasList>(params);
+      return new ShardedTable<LockSpace<TbbLock>, CppCasList>(params);
     }, parallel_brokers, "CppCasList", params, results);
 
     if (all) {
@@ -263,12 +261,12 @@ int main(int argc, char **argv) {
       //
 
       perf<Table>([=, &params] {
-        return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+        return new ShardedTable<LockSpace<StdLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
       }, parallel_brokers, "StdLockAndTable", params, results);
 
       // Test this one with many shards; also tested below.
       perf<Table>([=, &params] {
-        return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+        return new ShardedTable<LockSpace<TbbLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
       }, parallel_brokers, "TbbLockAndTable", params, results);
 
       /* Hangs!
@@ -295,19 +293,19 @@ int main(int argc, char **argv) {
         //
 
         perf<Table>([=, &params] {
-          return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+          return new ShardedTable<LockSpace<StdLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
         }, parallel_brokers, "StdLockAndTable", params, results);
 
         perf<Table>([=, &params] {
-          return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+          return new ShardedTable<LockSpace<TbbLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
         }, parallel_brokers, "TbbLockAndTable", params, results);
 
         perf<Table>([=, &params] {
-          return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+          return new ShardedTable<LockSpace<StdLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
         }, parallel_brokers, "StdLockTbbTable", params, results);
 
         perf<Table>([=, &params] {
-          return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+          return new ShardedTable<LockSpace<TbbLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
         }, parallel_brokers, "TbbLockStdTable", params, results);
       }
     }

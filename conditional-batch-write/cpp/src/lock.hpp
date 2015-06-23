@@ -18,22 +18,164 @@
 #define LOCK_HPP
 
 #include <algorithm>
+#include <condition_variable>
+#include <mutex>
 #include <vector>
 
 #include "table.hpp"
+#include "tbb/spin_mutex.h"
 
+/** A reader/writer lock that uses a logical clock.
+  *
+  * When a reader or writer acquires the lock, it supplies a timestamp, and that may raise the
+  * logical time. The logical time is returned to a writer after it acquires the lock, and the
+  * writer is obliged to commit writes using a timestamp strictly after that time. When the writer
+  * releases the lock, it provides the write timestamp, and that may again raise the logical time.
+  *
+  * Only one writer at a time may hold the lock. Multiple readers may acquire the lock, some while
+  * a writer holds it. Readers using a timestamp on or before the logical time will acquire the
+  * lock immediately. Those using a timestamp strictly after the logical time will be blocked if a
+  * writer holds the lock.
+  *
+  * This lock is useful with multiversion concurrency control. In a multiversion table, a reader
+  * can get a value as-of some read time, even if there may be a concurrent writer, so long as that
+  * writer uses a write time greater than the read time.
+  *
+  * @tparam M A mutex; for example, `std::mutex` or `tbb::spin_lock`.
+  */
+template<typename M>
 class Lock {
 
   public:
 
-    virtual uint32_t time() = 0;
+    uint32_t time() {
+      lock.lock();
+      auto time = getTime(state);
+      lock.unlock();
+      return time;
+    }
 
-    virtual void read(uint32_t time) = 0;
+    /** A reader wants to acquire the lock; the lock will ensure no future writer commits at or
+      * before that timestamp. This leaves the lock in an exclusive state; the user must call
+      * `read_release` promptly.
+      *
+      * @param time The forecasted time; this may raise the logical time.
+      */
+    void read_acquire(uint32_t time) {
+      lock.lock();
+      while (true) {
+        if (time <= getTime(state))
+          return;
+        if (!isHeld(state)) {
+          state = makeState(time, false);
+          return;
+        }
+        if (future < time)
+          future = time;
+        readers.wait(lock);
+      }
+    }
 
-    virtual uint32_t write(uint32_t time) = 0;
+    /** Return the lock to a shareable state, so that other readers and a writer at a higher
+      * timestamp may proceed.
+      */
+    void read_release() {
+      lock.unlock();
+    }
 
-    virtual void release(uint32_t time) = 0;
+    /** A reader wants to acquire the lock; the lock will ensure no future writer commits at or
+      * before that timestamp. This call leaves the lock in a shareable state; other readers and
+      * a writer at a higher timestamp may proceed.
+      *
+      * @param time The forecasted time; this may raise the logical time.
+      */
+    void read(uint32_t time) {
+      read_acquire(time);
+      read_release();
+    }
+
+    /** A writer wants to acquire the lock; the lock provides the logical time, and the writer must
+      * commit strictly after that time. This leaves the lock in an exclusive state; the user must
+      * call `write_release` promptly.
+      *
+      * @param time The forecasted time; this may raise the logical time.
+      * @return The logical time; the writer must commit using a timestamp strictly after this time.
+      */
+    uint32_t write_acquire(uint32_t time) {
+      lock.lock();
+      while (isHeld(state))
+        writers.wait(lock);
+      uint32_t now = getTime(state);
+      if (now < time)
+        now = time;
+      state = makeState(now, true);
+      return now;
+    }
+
+    /** Return the lock to a shareable state; other  readers at a lower timestamp may proceed.
+      * The writer must eventually call `release`.
+      */
+    void write_release()  {
+      lock.unlock();
+    }
+
+    /** A writer wants to acquire the lock; the lock provides the logical time, and the writer must
+      * commit strictly after that time. This call leaves the lock in a shareable state; other
+      * readers at a lower timestamp may proceed. The writer must eventually call `release`.
+      *
+      * @param time The forecasted time; this may raise the logical time.
+      * @return The logical time; the writer must commit using a timestamp strictly after this time.
+      */
+    uint32_t write(uint32_t time)  {
+      auto now = write_acquire(time);
+      write_release();
+      return now;
+    }
+
+    void release_acquire(uint32_t time) {
+      lock.lock();
+      if (future < time)
+        future = time;
+      state = makeState(future, false);
+    }
+
+    void release_release() {
+      lock.unlock();
+      readers.notify_all();
+      writers.notify_one();
+    }
+
+    void release(uint32_t time) {
+      release_acquire(time);
+      release_release();
+    }
+
+  private:
+
+    uint32_t getTime(uint32_t s) {
+      return s >> 1;
+    }
+
+    bool isHeld(uint32_t s) {
+      return s & 1;
+    }
+
+    uint32_t makeState (uint32_t time, bool held) {
+      if (held)
+        return (time << 1) | 1;
+      else
+        return time << 1;
+    }
+
+    M lock;
+    std::condition_variable_any readers;
+    std::condition_variable_any writers;
+    uint32_t state = 0;
+    uint32_t future = 0;
 };
+
+typedef Lock<std::mutex> StdLock;
+typedef Lock<tbb::spin_mutex> TbbLock;
 
 // L is a Lock.
 template <typename L>

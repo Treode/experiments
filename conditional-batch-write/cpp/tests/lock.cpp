@@ -20,9 +20,8 @@
 #include <memory>
 #include <thread>
 
-#include "StdConditionLock.hpp"
-#include "TbbConditionLock.hpp"
 #include "catch.hpp"
+#include "lock.hpp"
 
 using std::async;
 using std::chrono::milliseconds;
@@ -55,11 +54,13 @@ void require_ready (future<T> &f) {
   REQUIRE(f.wait_for(milliseconds(10)) == ready);
 }
 
-void lock_behaviors(const function<Lock*(void)> &new_lock) {
+// L is a lock
+template<typename L>
+void lock_behaviors(const function<L*(void)> &new_lock) {
 
   SECTION("A lock should block a later writer", "[lock]") {
     repeat ([&new_lock]{
-      unique_ptr<Lock> lock_ptr (new_lock());
+      unique_ptr<L> lock_ptr (new_lock());
       auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
@@ -74,7 +75,7 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
 
   SECTION("A lock should block a later writer and raise the time", "[lock]") {
     repeat ([&new_lock] {
-      unique_ptr<Lock> lock_ptr (new_lock());
+      unique_ptr<L> lock_ptr (new_lock());
       auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
@@ -89,7 +90,7 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
 
   SECTION("A lock should block an earlier writer and raise the time", "[lock]") {
     repeat ([&new_lock] {
-      unique_ptr<Lock> lock_ptr (new_lock());
+      unique_ptr<L> lock_ptr (new_lock());
       auto &lock = *lock_ptr;
       lock.write(2);
       auto f = async([&lock] {
@@ -104,7 +105,7 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
 
   SECTION("A lock should block a later reader", "[lock]") {
     repeat ([&new_lock] {
-      unique_ptr<Lock> lock_ptr (new_lock());
+      unique_ptr<L> lock_ptr (new_lock());
       auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
@@ -120,7 +121,7 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
 
   SECTION("A lock should block a later reader and raise the time", "[lock]") {
     repeat ([&new_lock] {
-      unique_ptr<Lock> lock_ptr (new_lock());
+      unique_ptr<L> lock_ptr (new_lock());
       auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
@@ -137,7 +138,7 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
 
   SECTION("A lock should permit an earlier reader", "[lock]") {
     repeat ([&new_lock] {
-      unique_ptr<Lock> lock_ptr (new_lock());
+      unique_ptr<L> lock_ptr (new_lock());
       auto &lock = *lock_ptr;
       lock.write(1);
       auto f = async([&lock] {
@@ -151,13 +152,13 @@ void lock_behaviors(const function<Lock*(void)> &new_lock) {
 }
 
 TEST_CASE ("The StdConditionLock should work", "[locks]") {
-  lock_behaviors([] {
-    return new StdConditionLock();
+  lock_behaviors<StdLock>([] {
+    return new StdLock();
   });
 }
 
 TEST_CASE ("The TbbConditionLock should work", "[locks]") {
-  lock_behaviors([] {
-    return new TbbConditionLock();
+  lock_behaviors<TbbLock>([] {
+    return new TbbLock();
   });
 }

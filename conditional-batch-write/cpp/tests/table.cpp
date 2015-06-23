@@ -22,8 +22,6 @@
 #include "CppCasList.hpp"
 #include "CppUnorderedMapOfMap.hpp"
 #include "CppVector.hpp"
-#include "StdConditionLock.hpp"
-#include "TbbConditionLock.hpp"
 #include "catch.hpp"
 #include "lock.hpp"
 #include "table.hpp"
@@ -120,7 +118,7 @@ TEST_CASE ("The CppVector should work", "[tables]") {
   table_behaviors([] (Params &params) {
     auto copy = params;
     copy.nshards = params.nlocks;
-    return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppVector>>(copy);
+    return new ShardedTable<LockSpace<TbbLock>, TbbMutexShard<CppVector>>(copy);
   }, true);
 }
 
@@ -128,30 +126,30 @@ TEST_CASE ("The CppCasList should work", "[tables]") {
   table_behaviors([] (Params &params) {
     auto copy = params;
     copy.nshards = params.nlocks;
-    return new ShardedTable<LockSpace<TbbConditionLock>, CppCasList>(copy);
+    return new ShardedTable<LockSpace<TbbLock>, CppCasList>(copy);
   }, true);
 }
 
 TEST_CASE ("The StdLockAndTable should work", "[tables]") {
   table_behaviors([] (Params &params) {
-    return new ShardedTable<LockSpace<StdConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+    return new ShardedTable<LockSpace<StdLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
 
 TEST_CASE ("The StdLockTbbTable should work", "[tables]") {
   table_behaviors([] (Params &params) {
-    return new ShardedTable<LockSpace<StdConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+    return new ShardedTable<LockSpace<StdLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
 
 TEST_CASE ("The TbbLockStdTable should work", "[tables]") {
   table_behaviors([] (Params &params) {
-    return new ShardedTable<LockSpace<TbbConditionLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
+    return new ShardedTable<LockSpace<TbbLock>, StdMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
 
 TEST_CASE ("The TbbLockAndTable should work", "[tables]") {
   table_behaviors([] (Params &params) {
-    return new ShardedTable<LockSpace<TbbConditionLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
+    return new ShardedTable<LockSpace<TbbLock>, TbbMutexShard<CppUnorderedMapOfMap>>(params);
   }, true);
 }
