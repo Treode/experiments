@@ -113,12 +113,9 @@ unsigned broker(Table &table, const Params &params) {
       // Processing.
       //sum += fib(10);
 
-      try {
-        Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
-        time = table.write(time, 2, rs) + 1;
-      } catch (stale_exception e) {
-        time = e.max + 1;
-      }
+      Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
+      table.write(time, 2, rs, time);
+      ++time;
     }
 
     // Write response to network.

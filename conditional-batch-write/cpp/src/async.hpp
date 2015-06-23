@@ -167,11 +167,8 @@ class FiberizedTable: public AsyncTable {
 
     tbb::task *write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt, tbb::task *current) {
       return fiber.enqueue(current, [=] () mutable {
-        try {
-          wt = table.write(ct, n, rs) + 1;
-        } catch (stale_exception e) {
-          wt = e.max + 1;
-        }
+        table.write(ct, n, rs, wt);
+        ++wt;
       });
     }
 

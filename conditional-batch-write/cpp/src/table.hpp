@@ -109,19 +109,6 @@ inline bool operator!=(const Cell &x, const Cell &y) {
   return !(x == y);
 }
 
-class stale_exception: public std::runtime_error {
-
-  public:
-
-    uint32_t cond, max;
-
-    stale_exception (uint32_t _cond, uint32_t _max):
-      runtime_error ("stale"),
-      cond (_cond),
-      max (_max)
-    {}
-};
-
 class Shard {
 
   public:
@@ -207,7 +194,7 @@ class Table {
 
     virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) const = 0;
 
-    virtual uint32_t write(uint32_t t, size_t n, const Row *rs) = 0;
+    virtual bool write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt) = 0;
 
     virtual void scan(std::vector<Cell> &cs) const =  0;
 
@@ -217,8 +204,8 @@ class Table {
       return vs;
     }
 
-    uint32_t write(uint32_t t, const std::vector<Row> &rs) {
-      return write(t, rs.size(), rs.data());
+    bool write(uint32_t ct, const std::vector<Row> &rs, uint32_t &wt) {
+      return write(ct, rs.size(), rs.data(), wt);
     }
 
     std::vector<Cell> scan() const {
@@ -242,11 +229,16 @@ class TableFromShard: public Table {
         shard.read(t, ks[i], vs[i]);
     }
 
-    uint32_t write(uint32_t t, size_t n, const Row *rs) {
-      raise(t);
-      auto wt = prepare(t, n, rs) + 1;
+    bool write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt) {
+      raise(ct);
+      auto vt = prepare(n, rs);
+      if (ct < vt) {
+        wt = vt;
+        return false;
+      }
+      wt = ++clock;
       commit(wt, n, rs);
-      return wt;
+      return true;
     }
 
     void scan(std::vector<Cell> &cs) const {
@@ -263,15 +255,13 @@ class TableFromShard: public Table {
         clock = t;
     }
 
-    uint32_t prepare(uint32_t t, size_t n, const Row *rs) const {
+    uint32_t prepare(size_t n, const Row *rs) const {
       uint32_t vt = 0;
       for (size_t i = 0; i < n; ++i) {
         auto _vt = shard.prepare(rs[i].k);
         if (vt < _vt)
           vt = _vt;
       }
-      if (t < vt)
-        throw stale_exception(t, vt);
       return vt;
     }
 
@@ -302,25 +292,26 @@ class ShardedTable: public Table {
       }
     }
 
-    uint32_t write(uint32_t t, size_t n, const Row *rs) {
-      auto wt = lock.write(t, n, rs)  + 1;
-      auto max = 0;
+    bool write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt) {
+      wt = lock.write(ct, n, rs)  + 1;
+      uint32_t vt = 0;
       for (size_t i = 0; i < n; ++i) {
         auto k = rs[i].k;
-        auto t2 = shards[k & mask].prepare(rs[i].k);
-        if (max < t2)
-          max = t2;
+        auto _vt = shards[k & mask].prepare(rs[i].k);
+        if (vt < _vt)
+          vt = _vt;
       }
-      if (t < max) {
+      if (ct < vt) {
         lock.release(wt, n, rs);
-        throw stale_exception(t, max);
+        wt = vt;
+        return false;
       }
       for (size_t i = 0; i < n; ++i) {
         auto &r = rs[i];
         shards[r.k & mask].commit(wt, r.k, r.v);
       }
       lock.release(wt, n, rs);
-      return wt;
+      return true;
     }
 
     void scan(std::vector<Cell> &cs) const {

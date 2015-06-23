@@ -34,8 +34,9 @@ using std::thread;
 using std::unique_ptr;
 using std::vector;
 
-void write(Table &table, uint32_t time, initializer_list<Row> rows) {
-  table.write(time, vector<Row> (rows));
+bool write(Table &table, uint32_t time, initializer_list<Row> rows) {
+  uint32_t wt;
+  return table.write(time, vector<Row> (rows), wt);
 }
 
 void expect(Table &table, uint32_t time, initializer_list<int> keys, initializer_list<Value> expected) {
@@ -82,7 +83,7 @@ void table_behaviors(const function<Table*(Params &)> &new_table, bool parallel)
   SECTION("A table should reject a stale write", "[table]") {
     unique_ptr<Table> table (new_table(params));
     write(*table, 0, {Row(0, 1)});
-    REQUIRE_THROWS_AS(write(*table, 0, {Row(0,2)}), stale_exception);
+    REQUIRE(!write(*table, 0, {Row(0,2)}));
     expect(*table, 1, {0}, {Value(1,1)});
   }
 
