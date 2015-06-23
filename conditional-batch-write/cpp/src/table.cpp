@@ -80,6 +80,7 @@ unsigned broker(Table &table, const Params &params) {
   std::default_random_engine reng;
   std::uniform_int_distribution<int> racct(0, params.naccounts);
   std::uniform_int_distribution<int> ramt(0, 1000);
+  uint32_t time = 0;
   unsigned sum = 0;
 
   auto count = params.ntransfers / params.nbrokers;
@@ -88,10 +89,9 @@ unsigned broker(Table &table, const Params &params) {
     { // Random reads.
       for (unsigned j = 0; j < params.nreads; ++j) {
         int a = racct(reng);
-        auto rt = table.time();
         int ks[] = {a};
         Value vs[1];
-        table.read(rt, 1, ks, vs);
+        table.read(time, 1, ks, vs);
         // Add to sum to ensure compiler doesn't optimize this away.
         sum += vs[0].v;
       }
@@ -106,19 +106,18 @@ unsigned broker(Table &table, const Params &params) {
       // Read request from network.
       //sum += fib(10);
 
-      auto rt = table.time();
       int ks[] = {a1, a2};
       Value vs[2];
-      table.read(rt, 2, ks, vs);
+      table.read(time, 2, ks, vs);
 
       // Processing.
       //sum += fib(10);
 
       try {
         Row rs[] = {Row(a1, vs[0].v - n), Row(a2, vs[1].v + n)};
-        table.write(rt, 2, rs);
+        time = table.write(time, 2, rs) + 1;
       } catch (stale_exception e) {
-        // ignored
+        time = e.max + 1;
       }
     }
 

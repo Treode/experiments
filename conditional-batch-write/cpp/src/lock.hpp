@@ -44,16 +44,10 @@ class LockSpace {
     LockSpace(Params &params):
       size(params.nlocks),
       mask(params.nlocks - 1),
-      clock(0),
       locks(params.nlocks)
     {}
 
-    uint32_t time() {
-      return clock.load();
-    }
-
     void read(uint32_t t, size_t n, const int *ks) {
-      raise(t);
       int is[n];
       auto end = idxs(n, ks, is);
       for (auto i = is; i < end; ++i)
@@ -65,7 +59,6 @@ class LockSpace {
     }
 
     uint32_t write(uint32_t t, size_t n, const Row *rs) {
-      raise(t);
       int is[n];
       auto end = idxs(n, rs, is);
       uint32_t max = 0;
@@ -82,7 +75,6 @@ class LockSpace {
     }
 
     void release(uint32_t t, size_t n, const Row *rs) {
-      raise(t);
       int is[n];
       auto end = idxs(n, rs, is);
       for (auto i = is; i < end; ++i)
@@ -93,23 +85,23 @@ class LockSpace {
       release(t, rs.size(), rs.data());
     }
 
-    void scan(uint32_t t) {
-      raise(t);
+    uint32_t scan() {
+      uint32_t t = 0;
+      for (size_t i = 0; i < size; ++i) {
+        auto _t = locks[i].time();
+        if (t < _t)
+          t = _t;
+      }
       for (size_t i = 0; i < size; ++i)
         locks[i].read(t);
+      return t;
     }
 
   private:
 
     const size_t size;
     const size_t mask;
-    std::atomic<uint32_t> clock;
     std::vector<L> locks;
-
-    void raise(uint32_t time) {
-      auto now = clock.load();
-      while (now < time && !clock.compare_exchange_weak(now, time));
-    }
 
     int *idxs(size_t n, const int *ks, int *is) {
       for (size_t i = 0; i < n; ++i)

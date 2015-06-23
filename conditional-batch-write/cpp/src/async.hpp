@@ -148,11 +148,9 @@ class AsyncTable {
 
   public:
 
-    virtual uint32_t time() = 0;
-
     virtual tbb::task* read(uint32_t t, size_t n, const int *ks, Value *vs, tbb::task *current) = 0;
 
-    virtual tbb::task *write(uint32_t t, size_t n, const Row *rs, tbb::task *current) = 0;
+    virtual tbb::task *write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt, tbb::task *current) = 0;
 };
 
 // T is a Table, F is a Fiber
@@ -161,22 +159,18 @@ class FiberizedTable: public AsyncTable {
 
   public:
 
-    uint32_t time() {
-      return table.time();
-    }
-
     tbb::task* read(uint32_t t, size_t n, const int *ks, Value *vs, tbb::task *current) {
       return fiber.enqueue(current, [=] {
         table.read(t, n, ks, vs);
       });
     }
 
-    tbb::task *write(uint32_t t, size_t n, const Row *rs, tbb::task *current) {
-      return fiber.enqueue(current, [=] {
+    tbb::task *write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt, tbb::task *current) {
+      return fiber.enqueue(current, [=] () mutable {
         try {
-          table.write(t, n, rs);
+          wt = table.write(ct, n, rs) + 1;
         } catch (stale_exception e) {
-          // ignored
+          wt = e.max + 1;
         }
       });
     }

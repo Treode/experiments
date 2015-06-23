@@ -30,11 +30,12 @@ class Broker: public task {
   public:
 
     Broker(AsyncTable &_table, const Params &params):
-      table(_table),
-      state(State::read),
-      count(params.ntransfers / params.nbrokers),
       racct(0, params.naccounts),
-      ramt(0, 1000)
+      ramt(0, 1000),
+      table(_table),
+      time(0),
+      state(State::read),
+      count(params.ntransfers / params.nbrokers)
     {}
 
     task *execute() {
@@ -47,7 +48,6 @@ class Broker: public task {
           a1 = racct(reng);
           while ((a2 = racct (reng)) == a1);
           n = ramt(reng);
-          rt = table.time();
           //cout << "transfer " << n << " from " << a1 << " to " << a2 << endl;
 
           ks[0] = a1;
@@ -55,7 +55,7 @@ class Broker: public task {
           set_ref_count(1);
           recycle_as_continuation();
           state = State::write;
-          return table.read (rt, 2, ks, vs, this);
+          return table.read (time, 2, ks, vs, this);
 
         case State::write:
           rs[0].k = a1;
@@ -65,7 +65,7 @@ class Broker: public task {
           set_ref_count(1);
           recycle_as_continuation();
           state = State::read;
-          return table.write (rt, 2, rs, this);
+          return table.write (time, 2, rs, time, this);
       }
     }
 
@@ -77,11 +77,11 @@ class Broker: public task {
     std::uniform_int_distribution<int> racct;
     std::uniform_int_distribution<int> ramt;
     AsyncTable &table;
+    uint32_t time;
 
     State state;
     unsigned count;
     int a1, a2, n;
-    uint32_t rt;
     int ks[2];
     Value vs[2];
     Row rs[2];

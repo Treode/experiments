@@ -205,8 +205,6 @@ class Table {
 
     virtual ~Table() = default;
 
-    virtual uint32_t time() const = 0;
-
     virtual void read(uint32_t t, size_t n, const int *ks, Value *vs) const = 0;
 
     virtual uint32_t write(uint32_t t, size_t n, const Row *rs) = 0;
@@ -238,10 +236,6 @@ class TableFromShard: public Table {
 
   public:
 
-    uint32_t time() const {
-      return clock;
-    }
-
     void read(uint32_t t, size_t n, const int *ks, Value *vs) const {
       raise(t);
       for (size_t i = 0; i < n; ++i)
@@ -250,8 +244,9 @@ class TableFromShard: public Table {
 
     uint32_t write(uint32_t t, size_t n, const Row *rs) {
       raise(t);
-      prepare(t, n, rs);
-      return commit(n, rs);
+      auto wt = prepare(t, n, rs) + 1;
+      commit(wt, n, rs);
+      return wt;
     }
 
     void scan(std::vector<Cell> &cs) const {
@@ -261,7 +256,6 @@ class TableFromShard: public Table {
   private:
 
     mutable uint32_t clock = 0;
-
     S shard;
 
     void raise(uint32_t t) const {
@@ -269,22 +263,21 @@ class TableFromShard: public Table {
         clock = t;
     }
 
-    void prepare(uint32_t t, size_t n, const Row *rs) const {
-      uint32_t max = 0;
+    uint32_t prepare(uint32_t t, size_t n, const Row *rs) const {
+      uint32_t vt = 0;
       for (size_t i = 0; i < n; ++i) {
-        auto t2 = shard.prepare(rs[i].k);
-        if (max < t2)
-          max = t2;
+        auto _vt = shard.prepare(rs[i].k);
+        if (vt < _vt)
+          vt = _vt;
       }
-      if (max > t)
-        throw stale_exception(t, max);
+      if (t < vt)
+        throw stale_exception(t, vt);
+      return vt;
     }
 
-    uint32_t commit(size_t n, const Row *rs) {
-      auto t = ++clock;
+    void commit(uint32_t t, size_t n, const Row *rs) {
       for (size_t i = 0; i < n; ++i)
-        shard.commit(clock, rs[i].k, rs[i].v);
-      return clock;
+        shard.commit(t, rs[i].k, rs[i].v);
     }
 };
 
@@ -300,10 +293,6 @@ class ShardedTable: public Table {
       shards(params.nshards),
       lock(params)
     {}
-
-    uint32_t time() const {
-      return lock.time();
-    }
 
     void read(uint32_t t, size_t n, const int *ks, Value *vs) const {
       lock.read(t, n, ks);
@@ -335,8 +324,7 @@ class ShardedTable: public Table {
     }
 
     void scan(std::vector<Cell> &cs) const {
-      auto t = time();
-      lock.scan(t);
+      auto t = lock.scan();
       for (size_t i = 0; i < size; ++i)
         shards[i].scan(t, cs);
     }
