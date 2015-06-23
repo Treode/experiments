@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <vector>
 
+#include "CppArray.hpp"
 #include "CppCasList.hpp"
 #include "CppUnorderedMapOfMap.hpp"
 #include "CppVector.hpp"
@@ -253,6 +254,10 @@ int main(int argc, char **argv) {
     perf<Table>([=, &params] {
       return new ShardedTable<LockSpace<TbbLock>, CppCasList>(params);
     }, parallel_brokers, "CppCasList", params, results);
+
+    perf<Table>([=, &params] {
+      return new LockingShardTable<LockSpace<TbbLock>, CppArray>(params);
+    }, parallel_brokers, "CppArray", params, results);
 
     if (all) {
 

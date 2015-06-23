@@ -19,6 +19,7 @@
 #include <thread>
 #include <vector>
 
+#include "CppArray.hpp"
 #include "CppCasList.hpp"
 #include "CppUnorderedMapOfMap.hpp"
 #include "CppVector.hpp"
@@ -127,6 +128,14 @@ TEST_CASE ("The CppCasList should work", "[tables]") {
     auto copy = params;
     copy.nshards = params.nlocks;
     return new ShardedTable<LockSpace<TbbLock>, CppCasList>(copy);
+  }, true);
+}
+
+TEST_CASE ("The CppArray should work", "[tables]") {
+  table_behaviors([] (Params &params) {
+    auto copy = params;
+    copy.nshards = params.nlocks;
+    return new LockingShardTable<LockSpace<TbbLock>, CppArray>(copy);
   }, true);
 }
 

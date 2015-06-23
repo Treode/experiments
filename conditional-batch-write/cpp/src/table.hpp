@@ -17,6 +17,7 @@
 #ifndef TABLE_HPP
 #define TABLE_HPP
 
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <mutex>
@@ -293,7 +294,7 @@ class ShardedTable: public Table {
     }
 
     bool write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt) {
-      wt = lock.write(ct, n, rs)  + 1;
+      wt = lock.write(ct, n, rs) + 1;
       uint32_t vt = 0;
       for (size_t i = 0; i < n; ++i) {
         auto k = rs[i].k;
@@ -326,6 +327,122 @@ class ShardedTable: public Table {
     const size_t mask;
     std::vector<S> shards;
     mutable L lock;
+};
+
+class LockingShard {
+
+  public:
+
+    virtual ~LockingShard() = default;
+
+    virtual void read(uint32_t t, int k, Value &v) const = 0;
+
+    virtual void prepare(uint32_t ct, int k, uint32_t &vt, uint32_t &lt) const = 0;
+
+    virtual void prepare(uint32_t ct, int k1, int k2, uint32_t &vt, uint32_t &lt) const = 0;
+
+    virtual void commit(uint32_t t, int k, int v) = 0;
+
+    virtual void commit(uint32_t t, int k1, int v1, int k2, int v2) = 0;
+
+    virtual void abort() = 0;
+
+    virtual void scan(uint32_t t, std::vector<Cell> &cs) const = 0;
+};
+
+// L is a LockSpace. S is a Shard.
+template <typename L, typename S>
+class LockingShardTable: public Table {
+
+  public:
+
+    LockingShardTable(Params &params):
+      size(params.nshards),
+      mask(params.nshards-1),
+      shards(params.nshards)
+    {}
+
+    void read(uint32_t t, size_t n, const int *ks, Value *vs) const {
+      for (size_t i = 0; i < n; ++i) {
+        auto k = ks[i];
+        shards[k & mask].read(t, k, vs[i]);
+      }
+    }
+
+    bool write(uint32_t ct, size_t n, const Row *rs, uint32_t &wt) {
+      bool r;
+      if (n == 1)
+        r = _write(ct, rs[0], wt);
+      else if (n == 2)
+        r = _write(ct, rs[0], rs[1], wt);
+      else
+        assert(false);
+      return r;
+    }
+
+    void scan(std::vector<Cell> &cs) const {
+      uint32_t t = 0;
+      for (size_t i = 0; i < size; ++i) {
+        auto _t = shards[i].time();
+        if (t < _t)
+          t = _t;
+      }
+      for (size_t i = 0; i < size; ++i)
+        shards[i].scan(t, cs);
+    }
+
+  private:
+
+    const size_t size;
+    const size_t mask;
+    std::vector<S> shards;
+
+    bool _write(uint32_t t, const Row &r, uint32_t &wt) {
+      int i = r.k & mask;
+      uint32_t vt = 0, lt = 0;
+      shards[i].prepare(t, r.k, vt, lt);
+      if (t < vt) {
+        shards[i].abort();
+        wt = vt;
+        return false;
+      }
+      wt = lt + 1;
+      shards[i].commit(wt, r.k, r.v);
+      return true;
+    }
+
+    bool _write(uint32_t t, const Row &r1, const Row &r2, uint32_t &wt) {
+      int i1 = r1.k & mask;
+      int i2 = r2.k & mask;
+      uint32_t vt = 0, lt = 0;
+      if (i1 < i2) {
+        shards[i1].prepare(t, r1.k, vt, lt);
+        shards[i2].prepare(t, r2.k, vt, lt);
+      } else if (i2 < i1) {
+        shards[i2].prepare(t, r2.k, vt, lt);
+        shards[i1].prepare(t, r1.k, vt, lt);
+      } else {
+        shards[i1].prepare(t, r1.k, r2.k, vt, lt);
+      }
+      if (t < vt) {
+        if (i1 == i2) {
+          shards[i1].abort();
+        } else {
+          shards[i1].abort();
+          shards[i2].abort();
+        }
+        wt = vt;
+        return false;
+      }
+      wt = lt + 1;
+      if (i1 == i2) {
+        shards[i1].commit(wt, r1.k, r1.v, r2.k, r2.v);
+      } else {
+        shards[i1].commit(wt, r1.k, r1.v);
+        shards[i2].commit(wt, r2.k, r2.v);
+      }
+      return true;
+    }
 };
 
 unsigned broker(Table &table, const Params &params);

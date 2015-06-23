@@ -108,6 +108,7 @@ class Lock {
       uint32_t now = getTime(state);
       if (now < time)
         now = time;
+      future = now;
       state = makeState(now, true);
       return now;
     }
