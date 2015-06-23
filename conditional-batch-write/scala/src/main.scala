@@ -220,6 +220,7 @@ object Main {
 
     var platform = "unknown"
     var nreads = 2
+    var ntransfers = 1<<14
     var all = false
 
     var argi = 0
@@ -242,19 +243,25 @@ object Main {
           require (argi < args.length, "-r requires a value")
           nreads = decode (args (argi))
 
+        // Number of random reads per transfer.
+        case "-t" =>
+          argi += 1
+          require (argi < args.length, "-t requires a value")
+          ntransfers = decode (args (argi))
+
         case _ =>
-          assert (false, "Usage: perf [-a] [-p platform] [-r nreads]")
+          assert (false, "Usage: perf [-a] [-p platform] [-r nreads] [-t ntransfers]")
       }
       argi += 1
     }
 
     val defaults = Params (
       platform = platform,
-      nlocks = 1 << 12,
+      nlocks = 1 << 10,
       nshards = 1,
-      naccounts = 1 << 12,
+      naccounts = 1 << 10,
       nbrokers = 1,
-      ntransfers = 1 << 14,
+      ntransfers = ntransfers,
       nreads = nreads)
 
     val results = new PerfResults
@@ -283,14 +290,15 @@ object Main {
     for (nbrokers <- brokers) {
       implicit val params = defaults.copy (nshards = defaults.nlocks, nbrokers = nbrokers)
 
-      // Test this one with many shards; also tested below.
-      results += (new SynchronizedShardedTablePerf).perf()
-
       // These are designed to be used with many shards only.
       results += (new JavaArrayListPerf).perf()
       results += (new CasListPerf).perf()
 
       if (all) {
+
+        // Test this one with many shards; also tested below.
+        results += (new SynchronizedShardedTablePerf).perf()
+
         results += (new SingleThreadExecutorPerf).perf()
         results += (new SimpleQueuePerf).perf()
         results += (new JCToolsQueuePerf).perf()
@@ -308,10 +316,11 @@ object Main {
     for (nshards <- shards; nbrokers <- brokers) {
       implicit val params = defaults.copy (nshards = nshards, nbrokers = nbrokers)
 
-      // Test this one with a "reasonable" number of shards; also tested above.
-      results += (new SynchronizedShardedTablePerf).perf()
-
       if (all) {
+
+        // Test this one with a "reasonable" number of shards; also tested above.
+        results += (new SynchronizedShardedTablePerf).perf()
+
         results += (new ShardedQueuePerf).perf()
 
         results += (new SynchronizedTablePerf).perf()
