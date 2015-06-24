@@ -41,7 +41,7 @@ class ConditionLock extends Lock {
     }
   }
 
-  def read (time: Int) {
+  def read_acquire (time: Int) {
     lock.lock()
     try {
       while (true) {
@@ -55,12 +55,22 @@ class ConditionLock extends Lock {
           future = time
         readers.await()
       }
-    } finally {
-      lock.unlock()
+    } catch {
+      case t: Throwable =>
+        lock.unlock();
+        throw t;
     }
   }
 
-  def write (time: Int): Int = {
+  def read_release(): Unit =
+    lock.unlock()
+
+  def read (time: Int) {
+    read_acquire (time)
+    read_release();
+  }
+
+  def write_acquire (time: Int): Int = {
     lock.lock()
     try {
       while (isHeld (state))
@@ -70,24 +80,47 @@ class ConditionLock extends Lock {
         now = time
       state = makeState (now, true)
       now
-    } finally {
-      lock.unlock()
+    } catch {
+      case t: Throwable =>
+        lock.unlock()
+        throw t
     }
   }
 
-  def release (time: Int) {
+  def write_release(): Unit =
+    lock.unlock()
+
+  def write (time: Int): Int = {
+    val now = write_acquire (time)
+    write_release()
+    now
+  }
+
+  def release_acquire (time: Int) {
     lock.lock()
     try {
       if (future < time)
         future = time
       state = makeState (future, false)
-      readers.signalAll()
-      writers.signal()
-    } finally {
-      lock.unlock()
+    } catch {
+      case t: Throwable =>
+        readers.signalAll()
+        writers.signal()
+        lock.unlock()
+        throw t;
     }
   }
-}
+
+  def release_release() {
+    readers.signalAll()
+    writers.signal()
+    lock.unlock()
+  }
+
+  def release (time: Int) {
+    release_acquire (time)
+    release_release()
+  }}
 
 object ConditionLock {
 
