@@ -62,9 +62,6 @@ trait Lock {
 /** It's easy to shard the lock space. */
 trait LockSpace {
 
-  /** Track the maximum time seen from any lock. */
-  def time: Int
-
   /** Acquire each identified lock. */
   def read (t: Int, ks: Seq [Int])
 
@@ -75,14 +72,12 @@ trait LockSpace {
   def release (t: Int, rs: Seq [Row])
 
   /** Acquire all locks for read. */
-  def scan (t: Int)
+  def scan(): Int
 }
 
 object LockSpace {
 
   private class SingleLock (lock: Lock) extends LockSpace {
-
-    def time = lock.time
 
     def read (t: Int, ks: Seq [Int]): Unit =
       lock.read (t)
@@ -93,25 +88,18 @@ object LockSpace {
     def release (t: Int, ks: Seq [Row]): Unit =
       lock.release (t)
 
-    def scan (t: Int): Unit =
+    def scan(): Int = {
+      val t = lock.time
       lock.read (t)
+      t
+    }
   }
 
   private class MultiLock (locks: Array [Lock]) extends LockSpace {
 
     private val mask = locks.size - 1
-    private var clock = new AtomicInteger (0)
-
-    private def raise (time: Int) {
-      var now = clock.get
-      while (now < time && !clock.compareAndSet (now, time))
-        now = clock.get
-    }
-
-    def time = clock.get
 
     def read (t: Int, ks: Seq [Int]) {
-      raise (t)
       val ns = maskKeys (mask, ks)
       foreach (ns) { n =>
         locks (n) .read (t)
@@ -124,24 +112,31 @@ object LockSpace {
         val ft = locks (n) .write (t)
         if (max < ft) max = ft
       }
-      raise (max)
       max
     }
 
     def release (t: Int, rs: Seq [Row]) {
-      raise (t)
       val ns = maskRows (mask, rs)
       foreach (ns) { n =>
         locks (n) .release (t)
       }}
 
-    def scan (t: Int) {
-      raise (t)
+    def scan(): Int = {
+      var t = 0
       var i = 0
+      while (i < locks.length) {
+        val _t = locks (i) .time
+        if (t < _t)
+          t = _t
+        i += 1
+      }
+      i = 0
       while (i < locks.length) {
         locks (i) .read (t)
         i += 1
-      }}}
+      }
+      t
+    }}
 
   def apply (nlocks: Int) (newLock: => Lock): LockSpace =
     if (nlocks == 1) {

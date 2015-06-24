@@ -161,8 +161,6 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
 
   private val shards = Array.fill (mask + 1) (newShard)
 
-  def time = lock.time
-
   private def read (t: Int, k: Int): Value =
     shards (k & mask) .read (t, k)
 
@@ -186,7 +184,7 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
     rs foreach (commit (t, _))
 
   def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (lock.time, rs) + 1
+    val wt = lock.write (t, rs) + 1
     try {
       prepare (t, rs)
       commit (wt, rs)
@@ -196,9 +194,8 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
     }}
 
   def scan(): Seq [Cell] = {
-    val now = lock.time
-    lock.scan (now)
-    shards.map (_.scan (now)) .flatten.toSeq
+    val t = lock.scan()
+    shards.map (_.scan (t)) .flatten.toSeq
   }
 
   def close(): Unit =
@@ -269,8 +266,6 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
 
   private val shards = Array.fill (mask + 1) (newShard)
 
-  def time = lock.time
-
   private def read (t: Int, k: Int): Future [Value] =
     shards (k & mask) .read (t, k)
 
@@ -294,7 +289,7 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
     rs foreach (commit (t, _))
 
   def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (lock.time, rs) + 1
+    val wt = lock.write (t, rs) + 1
     try {
       prepare (t, rs)
       commit (wt, rs)
@@ -304,9 +299,8 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
     }}
 
   def scan(): Seq [Cell] = {
-    val now = lock.time
-    lock.scan (now)
-    shards.map (_.scan (now)) .map (_.get) .flatten.toSeq
+    val t = lock.scan()
+    shards.map (_.scan (t)) .map (_.get) .flatten.toSeq
   }
 
   def close(): Unit =
@@ -370,8 +364,6 @@ class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => C
 
   private val shards = Array.fill (mask + 1) (newShard)
 
-  def time = lock.time
-
   def read (t: Int, ks: Int*): Seq [Value] = {
     lock.read (t, ks)
     val c = new Collector [Value] (ks.size)
@@ -393,7 +385,7 @@ class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => C
       shards (r.k & mask) .commit (t, r.k, r.v)
 
   def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (lock.time, rs) + 1
+    val wt = lock.write (t, rs) + 1
     try {
       prepare (t, rs)
       commit (wt, rs)
@@ -403,11 +395,10 @@ class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => C
     }}
 
   def scan(): Seq [Cell] = {
-    val now = lock.time
-    lock.scan (now)
+    val t = lock.scan()
     val c = new Collector [Seq [Cell]] (mask + 1)
     for ((s, i) <- shards.zipWithIndex)
-      s.scan (now, i, c)
+      s.scan (t, i, c)
     c.result.flatten.toSeq
   }
 

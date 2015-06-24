@@ -63,7 +63,7 @@ object Cell extends Ordering [Cell] {
     x compare y
 }
 
-class StaleException (cond: Int, max: Int) extends Exception {
+class StaleException (val cond: Int, val max: Int) extends Exception {
 
   override def getMessage: String =
     s"Stale write; cond: $cond, max: $max."
@@ -74,8 +74,6 @@ class StaleException (cond: Int, max: Int) extends Exception {
   * implementation options.
   */
 trait Table {
-
-  def time: Int
 
   /** Read keys `ks` as of time `t`. */
   def read (t: Int, ks: Int*): Seq [Value]
@@ -111,9 +109,6 @@ trait NewTable {
 /** Wrap a table with synchronized to make it thread safe. */
 class SynchronizedTable (table: Table) extends Table {
 
-  def time: Int =
-    synchronized (table.time)
-
   def read (t: Int, ks: Int*): Seq [Value] =
     synchronized (table.read (t, ks: _*))
 
@@ -137,9 +132,6 @@ trait NewSynchronizedTable extends NewTable {
 
 /** Wrap a table with a `SingleThreadScheduler` to make it thread safe. */
 class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends Table {
-
-  def time: Int =
-    scheduler.submit (table.time) .safeGet
 
   def read (t: Int, ks: Int*): Seq [Value] =
     scheduler.submit (table.read (t, ks: _*)) .safeGet
@@ -210,15 +202,15 @@ trait TableTools {
   def broker (table: Table) (implicit params: Params): Int = {
     import params.{naccounts, nbrokers, nreads, ntransfers}
     val random = new Random
+    var time = 0
     var nstale = 0
     var sum = 0
 
     def read() {
       val a = random.nextInt (naccounts)
-      val rt = table.time
       for (_ <- 0 until nreads) {
         // Add to sum to ensure compiler doesn't optimize this away.
-        val Seq (v) = table.read (rt, a)
+        val Seq (v) = table.read (time, a)
         sum += v.v
       }}
 
@@ -230,12 +222,13 @@ trait TableTools {
       val n = random.nextInt (1000)
 
       // Do the transfer
-      val rt = table.time
-      val Seq (v1, v2) = table.read (rt, a1, a2)
+      val Seq (v1, v2) = table.read (time, a1, a2)
       try {
-        table.write (rt, Row (a1, v1.v - n), Row (a2, v2.v + n))
+        time = table.write (time, Row (a1, v1.v - n), Row (a2, v2.v + n)) + 1
       } catch {
-        case t: StaleException => nstale += 1
+        case t: StaleException =>
+          time = t.max + 1
+          nstale += 1
       }}
 
     val count = ntransfers / nbrokers

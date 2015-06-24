@@ -27,8 +27,6 @@ class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
 
   private var table = new ConcurrentSkipListMap [Key, Int]
 
-  def time = lock.time
-
   private def read (t: Int, k: Int): Value = {
     val e = table.ceilingEntry (Key (k, t))
     if (e == null)
@@ -67,7 +65,7 @@ class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
     rs foreach (commit (t, _))
 
   def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (lock.time, rs) + 1
+    val wt = lock.write (t, rs) + 1
     try {
       prepare (t, rs)
       commit (wt, rs)
@@ -77,8 +75,7 @@ class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
     }}
 
   def scan(): Seq [Cell] = {
-    val now = lock.time
-    lock.scan (now)
+    val now = lock.scan()
     for {
       (Key (k, t), v) <- table.toSeq
       if t <= now

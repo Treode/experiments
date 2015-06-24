@@ -244,8 +244,6 @@ class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
     disruptor.start()
   }
 
-  def time = lock.time
-
   def read (t: Int, ks: Int*): Seq [Value] = {
     // Queue the read, await the result.
     lock.read (t, ks)
@@ -281,7 +279,7 @@ class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
   }
 
   def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (lock.time, rs) + 1
+    val wt = lock.write (t, rs) + 1
     try {
       prepare (t, rs)
       commit (wt, rs)
@@ -292,11 +290,10 @@ class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
 
   def scan(): Seq [Cell] = {
     // Queue the scan, await the result.
-    val now = lock.time
-    lock.scan (now)
+    val t = lock.scan()
     val n = ring.next()
     val event = ring.get (n)
-    event.scan (now)
+    event.scan (t)
     ring.publish (n)
     event.barrier.await()
     try (event.cells)
