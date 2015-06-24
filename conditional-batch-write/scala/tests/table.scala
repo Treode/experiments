@@ -56,7 +56,7 @@ trait TableBehaviors extends FlatSpec with TableTools {
   it should "reject a stale write" in {
     withTable { table =>
       table.write (0, Row (0, 1))
-      intercept [StaleException] (table.write (0, Row (0, 2)))
+      assertResult (Right (1)) (table.write (0, Row (0, 2)))
       assertSeq (Value (1, 1)) (table.read (1, 0))
     }}
 

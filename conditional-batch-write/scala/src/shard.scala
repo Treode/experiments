@@ -130,10 +130,8 @@ class TableFromShard (shard: Shard) extends Table {
   private def prepare (r: Row): Int =
     shard.prepare (r.k)
 
-  private def prepare (t: Int, rs: Seq [Row]) {
-    val max = rs.map (prepare (_)) .max
-    if (max > t) throw new StaleException (t, max)
-  }
+  private def prepare (rs: Seq [Row]): Int =
+    rs.map (prepare (_)) .max
 
   private def commit (t: Int, r: Row): Unit =
     shard.commit (t, r.k, r.v)
@@ -144,10 +142,13 @@ class TableFromShard (shard: Shard) extends Table {
     clock
   }
 
-  def write (t: Int, rs: Row*): Int = {
-    raise (t)
-    prepare (t, rs)
-    commit (rs)
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    raise (ct)
+    val vt = prepare (rs)
+    if (ct < vt)
+      Right (vt)
+    else
+      Left (commit (rs))
   }
 
   def scan(): Seq [Cell] =
@@ -172,10 +173,8 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
   private def prepare (r: Row): Int =
     shards (r.k & mask) .prepare (r.k)
 
-  private def prepare (t: Int, rs: Seq [Row]) {
-    val max = rs.map (prepare (_)) .max
-    if (max > t) throw new StaleException (t, max)
-  }
+  private def prepare (rs: Seq [Row]): Int =
+    rs.map (prepare (_)) .max
 
   private def commit (t: Int, r: Row): Unit =
     shards (r.k & mask) .commit (t, r.k, r.v)
@@ -183,15 +182,17 @@ class ShardedTable private (lock: LockSpace, mask: Int) (newShard: => Shard) ext
   private def commit (t: Int, rs: Seq [Row]): Unit =
     rs foreach (commit (t, _))
 
-  def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (t, rs) + 1
-    try {
-      prepare (t, rs)
-      commit (wt, rs)
-      wt
-    } finally {
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    val wt = lock.write (ct, rs) + 1
+    val vt = prepare (rs)
+    if (ct < vt) {
       lock.release (wt, rs)
-    }}
+      return Right (vt)
+    }
+    commit (wt, rs)
+    lock.release (wt, rs)
+    Left (wt)
+  }
 
   def scan(): Seq [Cell] = {
     val t = lock.scan()
@@ -277,10 +278,8 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
   private def prepare (r: Row): Future [Int] =
     shards (r.k & mask) .prepare (r.k)
 
-  private def prepare (t: Int, rs: Seq [Row]) {
-    val max = rs.map (prepare (_)) .map (_.get) .max
-    if (max > t) throw new StaleException (t, max)
-  }
+  private def prepare (rs: Seq [Row]): Int =
+    rs.map (prepare (_)) .map (_.get) .max
 
   private def commit (t: Int, r: Row): Unit =
     shards (r.k & mask) .commit (t, r.k, r.v)
@@ -288,15 +287,17 @@ class FutureShardedTable private (lock: LockSpace, mask: Int) (newShard: => Futu
   private def commit (t: Int, rs: Seq [Row]): Unit =
     rs foreach (commit (t, _))
 
-  def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (t, rs) + 1
-    try {
-      prepare (t, rs)
-      commit (wt, rs)
-      wt
-    } finally {
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    val wt = lock.write (ct, rs) + 1
+    val vt = prepare (rs)
+    if (ct < vt) {
       lock.release (wt, rs)
-    }}
+      return Right (vt)
+    }
+    commit (wt, rs)
+    lock.release (wt, rs)
+    Left (wt)
+  }
 
   def scan(): Seq [Cell] = {
     val t = lock.scan()
@@ -372,27 +373,28 @@ class CollectorShardedTable private (lock: LockSpace, mask: Int) (newShard: => C
     c.result
   }
 
-  private def prepare (t: Int, rs: Seq [Row]) {
+  private def prepare (rs: Seq [Row]): Int = {
     val c = new Collector [Int] (rs.size)
     for ((r, i) <- rs.zipWithIndex)
       shards (r.k & mask) .prepare (r.k, i, c)
-    val max = c.result.max
-    if (max > t) throw new StaleException (t, max)
+    c.result.max
   }
 
   private def commit (t: Int, rs: Seq [Row]): Unit =
     for (r <- rs)
       shards (r.k & mask) .commit (t, r.k, r.v)
 
-  def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (t, rs) + 1
-    try {
-      prepare (t, rs)
-      commit (wt, rs)
-      wt
-    } finally {
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    val wt = lock.write (ct, rs) + 1
+    val vt = prepare (rs)
+    if (ct < vt) {
       lock.release (wt, rs)
-    }}
+      return Right (vt)
+    }
+    commit (wt, rs)
+    lock.release (wt, rs)
+    Left (wt)
+  }
 
   def scan(): Seq [Cell] = {
     val t = lock.scan()

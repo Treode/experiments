@@ -256,7 +256,7 @@ class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
     finally (event.barrier.await())
   }
 
-  private def prepare (t: Int, rs: Seq [Row]) {
+  private def prepare (rs: Seq [Row]): Int = {
     // Queue the prepare, await the result.
     val n = ring.next()
     val event = ring.get (n)
@@ -264,8 +264,7 @@ class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
     ring.publish (n)
     try {
       event.barrier.await()
-      val max = math.max (event.t1, event.t2)
-      if (max > t) throw new StaleException (t, max)
+      math.max (event.t1, event.t2)
     } finally {
       event.barrier.await()
     }}
@@ -278,15 +277,17 @@ class DisruptorTable (lock: LockSpace) (implicit params: Params) extends Table {
     ring.publish (n)
   }
 
-  def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (t, rs) + 1
-    try {
-      prepare (t, rs)
-      commit (wt, rs)
-      wt
-    } finally {
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    val wt = lock.write (ct, rs) + 1
+    val vt = prepare (rs)
+    if (ct < vt) {
       lock.release (wt, rs)
-    }}
+      return Right (vt)
+    }
+    commit (wt, rs)
+    lock.release (wt, rs)
+    Left (wt)
+  }
 
   def scan(): Seq [Cell] = {
     // Queue the scan, await the result.

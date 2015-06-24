@@ -53,10 +53,8 @@ class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
     return t2
   }
 
-  private def prepare (t: Int, rs: Seq [Row]) {
-    val max = rs.map (prepare (_)) .max
-    if (max > t) throw new StaleException (t, max)
-  }
+  private def prepare (rs: Seq [Row]): Int =
+    rs.map (prepare (_)) .max
 
   private def commit (t: Int, r: Row): Unit =
     table.put (Key (r.k, t), r.v)
@@ -64,15 +62,17 @@ class JavaConcurrentSkipListMap (lock: LockSpace) extends Table {
   private def commit (t: Int, rs: Seq [Row]): Unit =
     rs foreach (commit (t, _))
 
-  def write (t: Int, rs: Row*): Int = {
-    val wt = lock.write (t, rs) + 1
-    try {
-      prepare (t, rs)
-      commit (wt, rs)
-      wt
-    } finally {
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    val wt = lock.write (ct, rs) + 1
+    val vt = prepare (rs)
+    if (ct < vt) {
       lock.release (wt, rs)
-    }}
+      return Right (vt)
+    }
+    commit (wt, rs)
+    lock.release (wt, rs)
+    Left (wt)
+  }
 
   def scan(): Seq [Cell] = {
     val now = lock.scan()

@@ -28,7 +28,7 @@ trait AsyncTable {
   def read (t: Int, ks: Int*) (cb: Seq [Value] => Any)
 
   /** Write rows `rs` if they haven't changed since time `t`. */
-  def write (t: Int, rs: Row*) (cb: Either [Int, StaleException] => Any)
+  def write (t: Int, rs: Row*) (cb: Either [Int, Int] => Any)
 
   /** Scan the entire history. This is not part of the performance timings. */
   def scan (cb: Seq [Cell] => Any)
@@ -71,8 +71,8 @@ trait AsyncTableTools {
       table.read (time, a1, a2) { case Seq (v1, v2) =>
         table.write (time, Row (a1, v1.v - n), Row (a2, v2.v + n)) { r =>
           r match {
-            case Right (e) =>
-              time = e.max + 1
+            case Right (vt) =>
+              time = vt + 1
               nstale += 1
             case Left (wt) =>
               time = wt + 1
@@ -114,14 +114,9 @@ class FiberizedTable (table: Table) (implicit scheduler: Scheduler) extends Asyn
     }
   }
 
-  def write (t: Int, rs: Row*) (cb: Either [Int, StaleException] => Any): Unit =
+  def write (t: Int, rs: Row*) (cb: Either [Int, Int] => Any): Unit =
     fiber.execute {
-      val result =
-        try {
-          Left (table.write (t, rs: _*))
-        } catch {
-          case t: StaleException => Right (t)
-        }
+      val result = table.write (t, rs: _*)
       cb (result)
     }
 
@@ -442,13 +437,13 @@ class AsyncShardedTable (
     loop()
   }
 
-  def write (t: Int, rs: Row*) (cb: Either [Int, StaleException] => Any) {
-    lock.write (t, rs) { _wt =>
+  def write (ct: Int, rs: Row*) (cb: Either [Int, Int] => Any) {
+    lock.write (ct, rs) { _wt =>
       val wt = _wt + 1
-      prepare (rs) { max =>
-        if (max > t) {
+      prepare (rs) { vt =>
+        if (ct < vt) {
           lock.release (wt, rs)
-          cb (Right (new StaleException (t, max)))
+          cb (Right (vt))
         } else {
           commit (wt, rs) { _ =>
             lock.release (wt, rs)

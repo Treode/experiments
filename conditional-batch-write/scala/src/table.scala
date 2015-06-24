@@ -63,12 +63,6 @@ object Cell extends Ordering [Cell] {
     x compare y
 }
 
-class StaleException (val cond: Int, val max: Int) extends Exception {
-
-  override def getMessage: String =
-    s"Stale write; cond: $cond, max: $max."
-}
-
 /** A table (or key-value table, hash table) using conditional batch write. Keys and values are
   * integers to keep this simple, because our focus is on comparing performance of different
   * implementation options.
@@ -79,7 +73,7 @@ trait Table {
   def read (t: Int, ks: Int*): Seq [Value]
 
   /** Write rows `rs` if they haven't changed since time `t`. */
-  def write (t: Int, rs: Row*): Int
+  def write (t: Int, rs: Row*): Either [Int, Int]
 
   /** Scan the entire history. This is not part of the performance timings. */
   def scan(): Seq [Cell]
@@ -112,7 +106,7 @@ class SynchronizedTable (table: Table) extends Table {
   def read (t: Int, ks: Int*): Seq [Value] =
     synchronized (table.read (t, ks: _*))
 
-  def write (t: Int, rs: Row*): Int =
+  def write (t: Int, rs: Row*): Either [Int, Int] =
     synchronized (table.write (t, rs: _*))
 
   def scan(): Seq [Cell] =
@@ -136,7 +130,7 @@ class SingleThreadTable (table: Table, scheduler: SingleThreadScheduler) extends
   def read (t: Int, ks: Int*): Seq [Value] =
     scheduler.submit (table.read (t, ks: _*)) .safeGet
 
-  def write (t: Int, rs: Row*): Int =
+  def write (t: Int, rs: Row*): Either [Int, Int] =
     scheduler.submit (table.write (t, rs: _*)) .safeGet
 
   def scan(): Seq [Cell] =
@@ -223,11 +217,11 @@ trait TableTools {
 
       // Do the transfer
       val Seq (v1, v2) = table.read (time, a1, a2)
-      try {
-        time = table.write (time, Row (a1, v1.v - n), Row (a2, v2.v + n)) + 1
-      } catch {
-        case t: StaleException =>
-          time = t.max + 1
+      table.write (time, Row (a1, v1.v - n), Row (a2, v2.v + n)) match {
+        case Left (wt) =>
+          time = wt + 1
+        case Right (max) =>
+          time = max + 1
           nstale += 1
       }}
 
