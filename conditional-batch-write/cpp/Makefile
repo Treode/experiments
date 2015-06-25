@@ -45,11 +45,11 @@ default: runtest
 
 target/perf: $(OBJS)
 	-mkdir target
-	g++ $(CFLAGS) $(LDFLAGS) $^ -o $@
+	g++ $(CFLAGS) $^ $(LDFLAGS) -o $@
 
 target/test: $(filter-out src/main.o, $(OBJS)) $(TEST_OBJS)
 	-mkdir target
-	g++ $(CFLAGS) $(LDFLAGS) $^ -o $@
+	g++ $(CFLAGS) $^ $(LDFLAGS) -o $@
 
 .PHONY: runperf
 runperf: target/perf
