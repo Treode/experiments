@@ -335,6 +335,8 @@ class LockingShard {
 
     virtual ~LockingShard() = default;
 
+    virtual uint32_t time() const = 0;
+
     virtual void read(uint32_t t, int k, Value &v) const = 0;
 
     virtual void prepare(uint32_t ct, int k, uint32_t &vt, uint32_t &lt) const = 0;
@@ -350,8 +352,8 @@ class LockingShard {
     virtual void scan(uint32_t t, std::vector<Cell> &cs) const = 0;
 };
 
-// L is a LockSpace. S is a Shard.
-template <typename L, typename S>
+// S is a Shard.
+template <typename S>
 class LockingShardTable: public Table {
 
   public:

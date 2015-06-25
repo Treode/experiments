@@ -41,14 +41,6 @@ class CppArray: public LockingShard {
       _read(h, t, k, v);
     }
 
-    void read (uint32_t t, int k1, Value &v1, int k2, Value &v2) const {
-      lock.read_acquire(t);
-      unsigned h = head;
-      lock.read_release();
-      _read(h, t, k1, v1);
-      _read(h, t, k2, v2);
-    }
-
     void prepare(uint32_t ct, int k, uint32_t &vt, uint32_t &lt) const {
       auto now = lock.write_acquire(ct);
       unsigned h = head;

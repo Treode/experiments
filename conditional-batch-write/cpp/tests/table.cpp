@@ -135,7 +135,7 @@ TEST_CASE ("The CppArray should work", "[tables]") {
   table_behaviors([] (Params &params) {
     auto copy = params;
     copy.nshards = params.nlocks;
-    return new LockingShardTable<LockSpace<TbbLock>, CppArray>(copy);
+    return new LockingShardTable<CppArray>(copy);
   }, true);
 }
 

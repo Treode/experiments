@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
     }, parallel_brokers, "CppCasList", params, results);
 
     perf<Table>([=, &params] {
-      return new LockingShardTable<LockSpace<TbbLock>, CppArray>(params);
+      return new LockingShardTable<CppArray>(params);
     }, parallel_brokers, "CppArray", params, results);
 
     if (all) {
