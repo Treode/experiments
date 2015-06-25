@@ -186,11 +186,14 @@ class DisruptorTablePerf (implicit p: Params)
   extends SyncTablePerf with NewDisruptorTable
 
 //
-// Alternative Logical-Lock strategies, using SynchronizedShardedTable
+// Alternative Logical-Lock strategies
 //
 
 class ConditionLockPerf (implicit p: Params)
   extends SyncTablePerf with NewConditionLockTable
+
+class JavaArrayPerf (implicit p: Params)
+  extends SyncTablePerf with NewJavaArray
 
 //
 // Asynchronous strategies.
@@ -293,6 +296,7 @@ object Main {
       // These are designed to be used with many shards only.
       results += (new JavaArrayListPerf).perf()
       results += (new CasListPerf).perf()
+      results += (new JavaArrayPerf).perf()
 
       if (all) {
 

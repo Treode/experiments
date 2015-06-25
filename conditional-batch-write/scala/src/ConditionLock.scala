@@ -78,6 +78,7 @@ class ConditionLock extends Lock {
       var now = getTime (state)
       if (now < time)
         now = time
+      future = now
       state = makeState (now, true)
       now
     } catch {

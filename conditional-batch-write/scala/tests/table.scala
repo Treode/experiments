@@ -165,6 +165,8 @@ class CollectorShardedTableSpec extends TableBehaviors with NewCollectorShardedT
 
 class DisruptorTableSpec extends TableBehaviors with NewDisruptorTable
 
+class JavaArraySpec extends TableBehaviors with NewJavaArray
+
 //
 // Alternative Logical-Lock strategies.
 //

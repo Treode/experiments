@@ -423,3 +423,142 @@ trait NewCollectorShardedTable extends NewTable {
   def newTable (implicit params: Params) =
     CollectorShardedTable (AqsLock.newSpace) (new CollectorShard (newRecommendedShard, newRecommendedScheduler))
 }
+
+/** A self-locking shard of the hash table. Whereas ShardedTable uses manages the logical locks
+  * directly, and then requires the shards to manage concurrent access to their data structures,
+  * a LockingShard incorporates the logical lock into its operations.
+  */
+trait LockingShard {
+
+  def time: Int
+
+  /** Read key `k` as of time `t`. */
+  def read (t: Int, k: Int): Value
+
+  /** Find the latest timestamp for key `k`, and the logical time. The writer must eventually call
+    * `commit` or `abort`.
+    */
+  def prepare (t: Int, k: Int): (Int, Int)
+
+  /** Find the latest timestamp for the keys `k1` and `k2`, and the logical time. The writer must
+    * eventually call `commit` or `abort`.*/
+  def prepare (t: Int, k1: Int, k2: Int): (Int, Int)
+
+  /** Set key `k` to value `v` at time `t`. */
+  def commit (t: Int, k: Int, v: Int)
+
+  /** Set key `k1` to value `v1` and `k2` to value `v2` at time `t`. */
+  def commit (t: Int, k1: Int, v1: Int, k2: Int, v2: Int)
+
+  /** Abort an earlier prepare. */
+  def abort()
+
+  /** Scan the history before and including time `t`. Not part of the performance timings. */
+  def scan (t: Int): Seq [Cell]
+}
+
+class LockingShardTable private (mask: Int) (newShard: => LockingShard) extends Table {
+
+  private val shards = Array.fill (mask + 1) (newShard)
+
+  private def read (t: Int, k: Int): Value =
+    shards (k & mask) .read (t, k)
+
+  def read (t: Int, ks: Int*): Seq [Value] =
+    ks map (read (t, _))
+
+  private def write (ct: Int, r: Row): Either [Int, Int] = {
+    val i = r.k & mask
+    val (vt, lt) = shards (i) .prepare (ct, r.k)
+    if (ct < vt) {
+      shards (i) .abort()
+      return Right (vt)
+    }
+    val wt = lt + 1
+    shards (i) .commit (wt, r.k, r.v)
+    Left (wt)
+  }
+
+  private def write (ct: Int, r1: Row, r2: Row): Either [Int, Int] = {
+
+    val i1 = r1.k & mask
+    val i2 = r2.k & mask
+    var vt = 0
+    var lt = 0
+
+    def prepare1 (i: Int, ct: Int, k: Int) {
+      val (_vt1, _lt1) = shards (i) .prepare (ct, k)
+      if (vt < _vt1)
+        vt = _vt1
+      if (lt < _lt1)
+        lt = _lt1
+    }
+
+    def prepare2 (i: Int, ct: Int, k1: Int, k2: Int) {
+      val (_vt1, _lt1) = shards (i) .prepare (ct, k1, k2)
+      if (vt < _vt1)
+        vt = _vt1
+      if (lt < _lt1)
+        lt = _lt1
+    }
+
+    if (i1 < i2) {
+      prepare1 (i1, ct, r1.k)
+      prepare1 (i2, ct, r2.k)
+    } else if (i2 < i1) {
+      prepare1 (i2, ct, r2.k)
+      prepare1 (i1, ct, r1.k)
+    } else {
+      prepare2 (i1, ct, r1.k, r2.k)
+    }
+    if (ct < vt) {
+      if (i1 == i2) {
+        shards (i1) .abort()
+      } else {
+        shards (i1) .abort()
+        shards (i2) .abort()
+      }
+      return Right (vt)
+    }
+    val wt = lt + 1;
+    if (i1 == i2) {
+      shards (i1) .commit (wt, r1.k, r1.v, r2.k, r2.v)
+    } else {
+      shards (i1) .commit (wt, r1.k, r1.v)
+      shards (i2) .commit (wt, r2.k, r2.v)
+    }
+    Left (wt)
+  }
+
+  def write (ct: Int, rs: Row*): Either [Int, Int] = {
+    if (rs.size == 1)
+      write (ct, rs(0));
+    else if (rs.size == 2)
+      write (ct, rs(0), rs(1));
+    else
+      throw new Exception;
+  }
+
+  def scan(): Seq [Cell] = {
+    var t = 0
+    for (s <- shards) {
+      val _t = s.time
+      if (t < _t)
+        t = _t
+    }
+    val b = Seq.newBuilder [Cell]
+    for (s <- shards)
+      b ++= s.scan (t)
+    b.result
+  }
+
+  def close() = ()
+}
+
+object LockingShardTable {
+
+  def apply (newShard: => LockingShard) (implicit params: Params): LockingShardTable = {
+    import params.nshards
+    require (JInt.highestOneBit (nshards) == nshards, "nshards must be a power of two")
+    new LockingShardTable (nshards - 1) (newShard)
+  }}
